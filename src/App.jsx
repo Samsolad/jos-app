@@ -6,6 +6,7 @@ import Register from './pages/auth/Register'
 import Layout from './pages/app/Layout'
 import Dashboard from './pages/app/Dashboard'
 import Projects from './pages/app/Projects'
+import Goals from './pages/app/Goals'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuthStore()
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="projects" element={<Projects />} />
+          <Route path="goals" element={<Goals />} />
         </Route>
       </Routes>
     </BrowserRouter>
