@@ -9,9 +9,11 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>
 )
 
-// Register service worker
+// Register service worker — with error handling
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.warn('SW registration failed:', err))
   })
 }
