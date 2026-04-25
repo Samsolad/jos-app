@@ -34,7 +34,9 @@ const useRevenueStore = create((set) => ({
   getTotals: (entries) => {
     const inn = entries.filter(e => e.type === 'in').reduce((s, e) => s + Number(e.amount), 0)
     const out = entries.filter(e => e.type === 'out').reduce((s, e) => s + Number(e.amount), 0)
-    return { inn, out, net: inn - out }
+    const savings = entries.filter(e => e.type === 'savings').reduce((s, e) => s + Number(e.amount), 0)
+    const investments = entries.filter(e => e.type === 'investment').reduce((s, e) => s + Number(e.amount), 0)
+    return { inn, out, net: inn - out, savings, investments }
   },
 }))
 

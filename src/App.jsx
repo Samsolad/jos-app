@@ -9,6 +9,10 @@ import Projects from './pages/app/Projects'
 import Goals from './pages/app/Goals'
 import Habits from './pages/app/Habits'
 import Revenue from './pages/app/Revenue'
+import Social from './pages/app/Social'
+import Family from './pages/app/Family'
+import Chat from './pages/app/Chat'
+import Profile from './pages/app/Profile'
 
 function Spinner() {
   return (
@@ -32,17 +36,6 @@ function AuthRoute({ children }) {
   return children
 }
 
-// Placeholder for pages not built yet
-function ComingSoon({ name }) {
-  return (
-    <div className="animate-fadeUp">
-      <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] font-medium mb-2">{name}</p>
-      <h1 className="font-serif text-[24px] font-bold mb-2">{name}</h1>
-      <p className="text-[13px] text-[#888] font-light">Coming in the next batch.</p>
-    </div>
-  )
-}
-
 export default function App() {
   const init = useAuthStore(s => s.init)
   useEffect(() => { init() }, [init])
@@ -59,10 +52,10 @@ export default function App() {
           <Route path="goals" element={<Goals />} />
           <Route path="habits" element={<Habits />} />
           <Route path="revenue" element={<Revenue />} />
-          <Route path="social" element={<ComingSoon name="Social" />} />
-          <Route path="family" element={<ComingSoon name="Family" />} />
-          <Route path="chat" element={<ComingSoon name="AI Chat" />} />
-          <Route path="profile" element={<ComingSoon name="Profile" />} />
+          <Route path="social" element={<Social />} />
+          <Route path="family" element={<Family />} />
+          <Route path="chat" element={<Chat />} />
+          <Route path="profile" element={<Profile />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

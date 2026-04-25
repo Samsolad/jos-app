@@ -26,6 +26,10 @@ export default function Revenue() {
 
   const { inn, out, net } = getTotals(entries)
 
+  // Revenue
+  const savings = entries.filter(e => e.type === 'savings').reduce((s, e) => s + Number(e.amount), 0)
+  const investments = entries.filter(e => e.type === 'investment').reduce((s, e) => s + Number(e.amount), 0)
+
   const fmt = (n) => `${cur}${Number(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
   const fd = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -38,11 +42,12 @@ export default function Revenue() {
       </h1>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-2 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
         {[
           { label: 'Total In', value: fmt(inn), color: '#4ade80' },
           { label: 'Total Out', value: fmt(out), color: '#f87171' },
-          { label: 'Net', value: fmt(net), color: net >= 0 ? '#4ade80' : '#f87171' },
+          { label: 'Savings', value: fmt(savings), color: '#60a5fa' },
+          { label: 'Investments', value: fmt(investments), color: '#c084fc' },
         ].map(s => (
           <div key={s.label} className="bg-[#111] border border-[#1f1f1f] rounded-md p-3 sm:p-4 text-center">
             <p className="text-[9px] sm:text-[10px] tracking-[0.14em] uppercase text-[#444] font-medium mb-2">{s.label}</p>
@@ -83,6 +88,8 @@ export default function Revenue() {
             >
               <option value="in">Income</option>
               <option value="out">Expense</option>
+              <option value="savings">Savings</option>
+              <option value="investment">Investment</option>
             </select>
           </div>
           <div className="flex gap-2">
@@ -118,7 +125,7 @@ export default function Revenue() {
             <div className="flex items-center gap-3">
               <span
                 className="font-serif text-[16px] font-bold"
-                style={{ color: e.type === 'in' ? '#4ade80' : '#f87171' }}
+                style={{ color: e.type === 'in' ? '#4ade80' : e.type === 'out' ? '#f87171' : e.type === 'savings' ? '#60a5fa' : '#c084fc' }}
               >
                 {e.type === 'in' ? '+' : '-'}{fmt(e.amount)}
               </span>
