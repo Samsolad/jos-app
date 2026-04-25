@@ -4,6 +4,8 @@ import useAuthStore from '../../store/authStore'
 import { askClaude } from '../../lib/claude'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
+import useMentorStore from '../../store/mentorStore'
+import useAuthStore from '../../store/authStore'
 
 const CAT_COLORS = {
   Career: '#60a5fa',
@@ -21,6 +23,8 @@ function GoalCard({ goal, onToggleStep, onDelete, onAdjust }) {
   const done = steps.filter(s => s.done).length
   const pct = steps.length ? Math.round((done / steps.length) * 100) : 0
   const color = CAT_COLORS[goal.category] || '#888'
+  const { trigger } = useMentorStore()
+  const profile = useAuthStore(s => s.profile)
 
   return (
     <div className={`bg-[#111] border border-[#1f1f1f] rounded-md p-4 sm:p-5 mb-4 ${goal.done ? 'opacity-40' : ''}`}>
@@ -491,7 +495,20 @@ Rules:
         <GoalCard
           key={g.id}
           goal={g}
-          onToggleStep={toggleGoalStep}
+          onToggleStep={async (goalId, stepId) => {
+  await toggleGoalStep(goalId, stepId)
+  const goal = goals.find(g => g.id === goalId)
+  if (!goal) return
+  const step = goal.goal_steps?.find(s => s.id === stepId)
+  if (step && !step.done) {
+    const next = goal.goal_steps?.find(s => !s.done && s.id !== stepId)
+    if (next) {
+      await trigger('next_task', { task: next.text, project: goal.text }, profile)
+    } else {
+      await trigger('celebrate', { item: goal.text }, profile)
+    }
+  }
+}}
           onDelete={async () => {
             if (confirm('Delete this goal and its plan?')) await deleteGoal(g.id)
           }}

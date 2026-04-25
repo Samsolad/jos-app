@@ -7,6 +7,8 @@ import TaskUpdatePanel from '../../components/TaskUpdatePanel'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Badge from '../../components/ui/Badge'
+import useMentorStore from '../../store/mentorStore'
+import useAuthStore from '../../store/authStore'
 
 export default function Projects() {
   const { projects, loading, fetchProjects, addProject, deleteProject } = useProjectStore()
@@ -25,6 +27,8 @@ export default function Projects() {
   const activeProject = projects.find(p => p.id === activeId)
   const projectTasks = activeId ? (tasks[activeId] || []) : []
   const doneCount = projectTasks.filter(t => t.done).length
+  const { trigger } = useMentorStore()
+  const profile = useAuthStore(s => s.profile)
 
   const handleSelectProject = async (id) => {
     setActiveId(id)
@@ -213,7 +217,29 @@ export default function Projects() {
           <TaskItem
             task={t}
             index={i}
-            onToggle={() => toggleTask(activeId, t.id)}
+            onToggle={async () => {
+  await toggleTask(activeId, t.id)
+  const updated = tasks[activeId] || []
+  const justDone = updated.find(tk => tk.id === t.id)
+  if (justDone && !t.done) {
+    // Task was just marked done — find next
+    const next = updated.find(tk => !tk.done && !tk.blocked && tk.id !== t.id)
+    if (next) {
+      await trigger(
+        'next_task',
+        { task: next.text, project: activeProject?.name || '' },
+        profile,
+        [{ label: 'Continue', fn: () => {} }],
+      )
+    } else {
+      await trigger(
+        'celebrate',
+        { item: `all tasks in ${activeProject?.name || 'this project'}` },
+        profile,
+      )
+    }
+  }
+}}
             onUpdate={() => setUpdatingTask(updatingTask === t.id ? null : t.id)}
             onDelete={() => deleteTask(activeId, t.id)}
           />
