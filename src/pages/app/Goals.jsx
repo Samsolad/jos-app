@@ -5,7 +5,7 @@ import { askClaude } from '../../lib/claude'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import useMentorStore from '../../store/mentorStore'
-import useAuthStore from '../../store/authStore'
+
 
 const CAT_COLORS = {
   Career: '#60a5fa',

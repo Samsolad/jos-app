@@ -9,7 +9,6 @@ import Badge from '../../components/ui/Badge'
 import RemindersPanel from '../../components/RemindersPanel'
 import useReminderStore from '../../store/reminderStore'
 import useMentorStore from '../../store/mentorStore'
-import { useNavigate } from 'react-router-dom'
 
 function StatBox({ label, value, color = 'white', sub }) {
   const colors = {
