@@ -5,6 +5,7 @@ import { askClaude } from '../../lib/claude'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import useMentorStore from '../../store/mentorStore'
+import useReminderStore from '../../store/reminderStore'
 
 
 const CAT_COLORS = {
@@ -25,6 +26,7 @@ function GoalCard({ goal, onToggleStep, onDelete, onAdjust }) {
   const color = CAT_COLORS[goal.category] || '#888'
   const { trigger } = useMentorStore()
   const profile = useAuthStore(s => s.profile)
+  const { addReminder } = useReminderStore()
 
   return (
     <div className={`bg-[#111] border border-[#1f1f1f] rounded-md p-4 sm:p-5 mb-4 ${goal.done ? 'opacity-40' : ''}`}>
@@ -286,7 +288,6 @@ Rules:
     const deadline = calcDeadline(plan.timeline)
 
     if (session.editingGoalId) {
-      // Updating existing goal
       await updateGoal(session.editingGoalId, {
         timeline: plan.timeline || '',
         budget: plan.total_budget || '',
@@ -296,7 +297,6 @@ Rules:
       })
       await updateGoalSteps(session.editingGoalId, steps)
     } else {
-      // New goal
       await addGoal({
         text: session.goalText,
         category: session.category,
@@ -309,12 +309,39 @@ Rules:
       })
     }
 
+    // Auto-create reminders for each step
+    const baseDate = new Date()
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i]
+      if (!step.text) continue
+
+      // Space steps evenly across the timeline
+      const totalDays = deadline
+        ? Math.ceil((new Date(deadline) - new Date()) / 86400000)
+        : 90
+      const spacing = Math.floor(totalDays / steps.length)
+      const reminderDate = new Date(baseDate)
+      reminderDate.setDate(reminderDate.getDate() + spacing * (i + 1))
+      reminderDate.setHours(9, 0, 0, 0) // 9am
+
+      await addReminder({
+        title: `Goal step: ${step.text}`,
+        datetime: reminderDate.toISOString().slice(0, 16),
+        notes: `Part of goal: ${session.goalText}${step.timeframe ? ` · ${step.timeframe}` : ''}`,
+        type: 'reminder',
+        duration: 60,
+      })
+    }
+
     // Reset
     setSession(null)
     setPlanStep('idle')
     setGoalText('')
     setGoalCat('Career')
     setGoalCtx('')
+
+    // Mentor celebrate
+    await trigger('celebrate', { item: session.goalText }, profile)
   }
 
   // ── Open adjust panel for existing goal ────────────────────────

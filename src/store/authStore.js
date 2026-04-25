@@ -11,12 +11,22 @@ const useAuthStore = create((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
       const profile = await get().fetchProfile(session.user.id)
+  
+      // Check session ID matches
+      const localSessionId = sessionStorage.getItem('jos_session_id')
+      if (profile?.session_id && localSessionId && profile.session_id !== localSessionId) {
+        // Another device has logged in — sign this one out
+        await supabase.auth.signOut()
+        set({ user: null, profile: null, loading: false })
+        alert('You have been signed in on another device. Please log in again.')
+        return
+      }
+  
       set({ user: session.user, profile, loading: false })
     } else {
       set({ loading: false })
     }
-
-    // Listen for auth changes
+  
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await get().fetchProfile(session.user.id)
@@ -65,6 +75,18 @@ const useAuthStore = create((set, get) => ({
       password,
     })
     if (error) throw error
+  
+    // Write a session ID to the profile
+    const sessionId = crypto.randomUUID()
+    sessionStorage.setItem('jos_session_id', sessionId)
+  
+    if (data.user) {
+      await supabase
+        .from('profiles')
+        .update({ session_id: sessionId })
+        .eq('id', data.user.id)
+    }
+  
     return data
   },
 

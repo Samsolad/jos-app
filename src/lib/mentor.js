@@ -1,5 +1,17 @@
 import { askClaude } from './claude'
 
+// iOS requires audio to be unlocked by a user gesture first
+let audioUnlocked = false
+
+export function unlockAudio() {
+  if (audioUnlocked) return
+  if (!window.speechSynthesis) return
+  const u = new SpeechSynthesisUtterance('')
+  u.volume = 0
+  window.speechSynthesis.speak(u)
+  audioUnlocked = true
+}
+
 // ── PERSONALITIES ─────────────────────────────────────────────────
 const TONES = {
   tough: `You are a tough-love accountability coach. Direct, no fluff. Call them out. Max 2 sentences. No cruelty but no sugarcoating either.`,

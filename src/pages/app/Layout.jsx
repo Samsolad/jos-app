@@ -3,6 +3,8 @@ import useAuthStore from '../../store/authStore'
 import { useState, useEffect } from 'react'
 import MentorBanner from '../../components/MentorBanner'
 import useMentorEngine from '../../hooks/useMentorEngine'
+import { unlockAudio } from '../../lib/mentor'
+import useAppFocus from '../../hooks/useAppFocus'
 
 const NAV = [
   { to: '/',        icon: '⊞', label: 'Hub'    },
@@ -52,6 +54,18 @@ export default function Layout() {
 
   // Start mentor engine
   useMentorEngine()
+  useAppFocus()
+
+// Unlock iOS audio on first tap
+useEffect(() => {
+  const unlock = () => unlockAudio()
+  document.addEventListener('touchstart', unlock, { once: true })
+  document.addEventListener('click', unlock, { once: true })
+  return () => {
+    document.removeEventListener('touchstart', unlock)
+    document.removeEventListener('click', unlock)
+  }
+}, [])
 
   // Close menus on route change
   useEffect(() => {
@@ -88,7 +102,12 @@ export default function Layout() {
     <div className="h-screen flex flex-col bg-[#080808]">
 
       {/* ── HEADER ── */}
-      <header className="flex items-center justify-between px-4 sm:px-6 h-[48px] sm:h-[52px] border-b border-[#1f1f1f] bg-[#080808]/[0.97] backdrop-blur-xl flex-shrink-0 sticky top-0 z-50">
+      <header className="flex items-center justify-between px-4 sm:px-6 border-b border-[#1f1f1f] bg-[#080808]/[0.97] backdrop-blur-xl flex-shrink-0 sticky top-0 z-50"
+  style={{ 
+    paddingTop: 'env(safe-area-inset-top)',
+    height: 'calc(52px + env(safe-area-inset-top))'
+  }}
+>
         <div className="text-[14px] sm:text-[15px] font-extrabold tracking-tight">
           J·OS <span className="text-[#444] font-light mx-1">/</span>
           <span className="text-[#888] font-normal text-[12px] sm:text-[13px]">{sectionName}</span>
