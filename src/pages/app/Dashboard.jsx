@@ -6,6 +6,8 @@ import useGoalStore from '../../store/goalStore'
 import useHabitStore from '../../store/habitStore'
 import useRevenueStore from '../../store/revenueStore'
 import Badge from '../../components/ui/Badge'
+import RemindersPanel from '../../components/RemindersPanel'
+import useReminderStore from '../../store/reminderStore'
 
 function StatBox({ label, value, color = 'white', sub }) {
   const colors = {
@@ -38,12 +40,14 @@ export default function Dashboard() {
   const { goals, fetchGoals } = useGoalStore()
   const { habits, logs, fetchHabits, isLoggedToday } = useHabitStore()
   const { entries, fetchEntries, getTotals } = useRevenueStore()
+  const { fetchReminders } = useReminderStore()
 
   useEffect(() => {
     fetchProjects()
     fetchGoals()
     fetchHabits()
     fetchEntries()
+    fetchReminders()
   }, [])
 
   const firstName = profile?.name?.split(' ')[0] || 'there'
@@ -89,7 +93,12 @@ export default function Dashboard() {
 
       <div className="h-px bg-[#1f1f1f] mb-6" />
 
-      {/* Key stats */}
+{/* Reminders & Meetings */}
+<div className="mb-8">
+  <RemindersPanel />
+</div>
+
+{/* Key stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-8">
         <StatBox label="Projects" value={projects.length} sub={`${activeProjects.length} active`} />
         <StatBox
