@@ -291,7 +291,14 @@ export default function Dashboard() {
       {/* Motivate Me */}
       <div className="mt-6">
         <button
-          onClick={async () => {
+          onClick={async (e) => {
+            // Unlock iOS audio directly in the tap handler
+            if (window.speechSynthesis) {
+              window.speechSynthesis.cancel()
+              const unlock = new SpeechSynthesisUtterance(' ')
+              unlock.volume = 0.01
+              window.speechSynthesis.speak(unlock)
+            }
             await trigger(
               'motivate',
               {

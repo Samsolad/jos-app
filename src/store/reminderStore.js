@@ -13,15 +13,36 @@ const useReminderStore = create((set, get) => ({
   },
 
   addReminder: async (reminder) => {
-    const current = get().reminders
-    const updated = [...current, {
-      id: crypto.randomUUID(),
-      ...reminder,
-      done: false,
-      createdAt: new Date().toISOString(),
-    }]
-    await supabase.from('profiles').update({ reminders: updated }).eq('id', (await supabase.auth.getUser()).data.user?.id)
-    set({ reminders: updated })
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+
+      // Fetch current reminders
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('reminders')
+        .eq('id', user.id)
+        .single()
+
+      const current = profileData?.reminders || []
+      const updated = [...current, {
+        id: crypto.randomUUID(),
+        ...reminder,
+        done: false,
+        createdAt: new Date().toISOString(),
+      }]
+
+      await supabase
+        .from('profiles')
+        .update({ reminders: updated })
+        .eq('id', user.id)
+
+      set({ reminders: updated })
+      return updated[updated.length - 1]
+    } catch (err) {
+      console.error('addReminder error:', err)
+      return null
+    }
   },
 
   toggleReminder: async (id) => {

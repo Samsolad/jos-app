@@ -1,61 +1,71 @@
 import { useEffect } from 'react'
-import useProjectStore from '../store/projectStore'
-import useGoalStore from '../store/goalStore'
-import useHabitStore from '../store/habitStore'
-import useRevenueStore from '../store/revenueStore'
+import { useNavigate } from 'react-router-dom'
+import useProjectStore  from '../store/projectStore'
+import useGoalStore     from '../store/goalStore'
+import useHabitStore    from '../store/habitStore'
+import useRevenueStore  from '../store/revenueStore'
 import useReminderStore from '../store/reminderStore'
-import useAuthStore from '../store/authStore'
-import { supabase } from '../lib/supabase'
+import useAuthStore     from '../store/authStore'
+import { supabase }     from '../lib/supabase'
 
 export default function useAppFocus() {
-  const { fetchProjects } = useProjectStore()
-  const { fetchGoals }    = useGoalStore()
-  const { fetchHabits }   = useHabitStore()
-  const { fetchEntries }  = useRevenueStore()
-  const { fetchReminders }= useReminderStore()
-  const { init }          = useAuthStore()
+  const navigate = useNavigate()
+  const { fetchProjects }  = useProjectStore()
+  const { fetchGoals }     = useGoalStore()
+  const { fetchHabits }    = useHabitStore()
+  const { fetchEntries }   = useRevenueStore()
+  const { fetchReminders } = useReminderStore()
+  const { init }           = useAuthStore()
 
   useEffect(() => {
-    let lastActive = Date.now()
+    let hiddenAt = null
 
-    const handleVisibilityChange = async () => {
+    const handleVisibility = async () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now()
+        return
+      }
+
+      // App came back into view
       if (document.visibilityState === 'visible') {
-        const awayMs = Date.now() - lastActive
+        const awayMs = hiddenAt ? Date.now() - hiddenAt : 0
+        hiddenAt = null
 
-        // If away for more than 5 minutes — refresh everything
-        if (awayMs > 5 * 60 * 1000) {
-          // Re-check auth session first
+        // Less than 2 minutes — do nothing
+        if (awayMs < 2 * 60 * 1000) return
+
+        try {
+          // Check if session is still valid
           const { data: { session } } = await supabase.auth.getSession()
+
           if (!session) {
-            // Session expired — re-init will redirect to login
-            await init()
+            // Session gone — redirect to login
+            navigate('/login')
             return
           }
 
-          // Refresh all data silently
-          fetchProjects()
-          fetchGoals()
-          fetchHabits()
-          fetchEntries()
-          fetchReminders()
+          // Refresh all stores silently
+          await Promise.all([
+            fetchProjects(),
+            fetchGoals(),
+            fetchHabits(),
+            fetchEntries(),
+            fetchReminders(),
+          ])
+        } catch (err) {
+          console.warn('App focus refresh error:', err)
         }
-
-        lastActive = Date.now()
-      } else {
-        lastActive = Date.now()
       }
     }
 
-    const handleFocus = () => {
-      handleVisibilityChange()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+    window.addEventListener('pageshow', handleVisibility)
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+      window.removeEventListener('pageshow', handleVisibility)
     }
   }, [])
 }

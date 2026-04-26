@@ -32,11 +32,37 @@ export function pickPersonality(situation) {
 
 // ── SPEAK ─────────────────────────────────────────────────────────
 export function speak(msg, situation = 'pa') {
-  if (!msg) return
-  if (!window.speechSynthesis) return
+  if (!msg || !window.speechSynthesis) return
 
+  // Cancel any current speech
   window.speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(msg)
+
+  // iOS needs a tiny delay after cancel before speaking
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(msg)
+
+    if (situation === 'idle' || situation === 'tough') {
+      u.rate = 0.88; u.pitch = 0.75
+    } else if (situation === 'celebrate' || situation === 'warm') {
+      u.rate = 1.0;  u.pitch = 1.05
+    } else if (situation === 'hype' || situation === 'push' || situation === 'motivate') {
+      u.rate = 1.08; u.pitch = 1.0
+    } else {
+      u.rate = 0.93; u.pitch = 0.85
+    }
+
+    u.volume = 1
+    u.lang = 'en-GB'
+
+    const voices = window.speechSynthesis.getVoices()
+    const preferred = voices.find(v =>
+      /daniel|arthur|aaron|google uk/i.test(v.name)
+    )
+    if (preferred) u.voice = preferred
+
+    window.speechSynthesis.speak(u)
+  }, 100)
+}
 
   // Voice varies by personality
   if (situation === 'idle' || situation === 'tough') {
@@ -59,7 +85,6 @@ export function speak(msg, situation = 'pa') {
   if (preferred) u.voice = preferred
 
   window.speechSynthesis.speak(u)
-}
 
 // ── GENERATE MENTOR MESSAGE ───────────────────────────────────────
 export async function mentorMessage(situation, context = {}, profile = {}) {
