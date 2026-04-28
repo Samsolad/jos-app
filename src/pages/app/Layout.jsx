@@ -3,7 +3,6 @@ import useAuthStore from '../../store/authStore'
 import { useState, useEffect } from 'react'
 import MentorBanner from '../../components/MentorBanner'
 import useMentorEngine from '../../hooks/useMentorEngine'
-import { unlockAudio } from '../../lib/mentor'
 import useAppFocus from '../../hooks/useAppFocus'
 
 const NAV = [
@@ -58,7 +57,13 @@ export default function Layout() {
 
 // Unlock iOS audio on first tap
 useEffect(() => {
-  const unlock = () => unlockAudio()
+  const unlock = () => {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance('')
+      u.volume = 0
+      window.speechSynthesis.speak(u)
+    }
+  }
   document.addEventListener('touchstart', unlock, { once: true })
   document.addEventListener('click', unlock, { once: true })
   return () => {
