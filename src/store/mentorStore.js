@@ -8,42 +8,50 @@ const useMentorStore = create((set, get) => ({
   actions:   [],
   _timer:    null,
 
-  show: (message, situation = 'pa', actions = []) => {
+  show: (message, situation, actions) => {
+    const sit = situation || 'pa'
+    const acts = actions || []
     clearTimeout(get()._timer)
     const timer = setTimeout(() => set({ visible: false }), 18000)
-    set({ message, situation, visible: true, actions, _timer: timer })
-    // Speak immediately — must be called in same tick as user gesture where possible
-    speak(message, situation)
+    set({ message, situation: sit, visible: true, actions: acts, _timer: timer })
+    speak(message, sit)
   },
 
   dismiss: () => {
     clearTimeout(get()._timer)
-    window.speechSynthesis?.cancel()
+    if (window.speechSynthesis) window.speechSynthesis.cancel()
     set({ visible: false })
   },
 
-  // Show instantly with a thinking message, then update with AI response
-  trigger: async (situation, context = {}, profile = {}, actions = []) => {
-    const personality = pickPersonality(situation)
+  trigger: async (situationIn, context, profileIn, actionsIn) => {
+    const ctx  = context   || {}
+    const prof = profileIn || {}
+    const acts = actionsIn || []
+    const sit  = situationIn || 'pa'
 
-    // Show immediately so voice fires in the gesture tick
-    const thinking = situation === 'motivate'
-      ? `Give me a moment, ${profile?.name?.split(' ')[0] || 'there'}…`
-      : null
+    const personality = pickPersonality(sit)
 
-    if (thinking) {
-      get().show(thinking, personality, actions)
+    // For motivate — show immediate placeholder so sound fires in gesture tick
+    if (sit === 'motivate') {
+      const name = prof?.name?.split(' ')[0] || 'there'
+      get().show(`On it, ${name}…`, personality, acts)
     }
 
-    // Generate real message
-    const msg = await mentorMessage(situation, context, profile)
+    // Generate AI message
+    const msg = await mentorMessage(sit, ctx, prof)
     if (!msg) return
 
-    // Update banner with real message and speak again
+    // Update with real message
     clearTimeout(get()._timer)
     const timer = setTimeout(() => set({ visible: false }), 18000)
-    set({ message: msg, situation: personality, visible: true, actions, _timer: timer })
-    speak(msg, situation)
+    set({
+      message:   msg,
+      situation: personality,
+      visible:   true,
+      actions:   acts,
+      _timer:    timer,
+    })
+    speak(msg, sit)
   },
 }))
 
