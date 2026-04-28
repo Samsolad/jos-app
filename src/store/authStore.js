@@ -25,20 +25,6 @@ const useAuthStore = create((set, get) => ({
 
     if (session?.user) {
       const profile = await get().fetchProfile(session.user.id)
-
-      // Session lock check
-      const localId  = getLocalSession()
-      const remoteId = profile?.session_id
-
-      if (remoteId && localId && remoteId !== localId) {
-        // Another device is logged in
-        await supabase.auth.signOut()
-        clearLocalSession()
-        set({ user: null, profile: null, loading: false })
-        window.location.href = '/login?reason=other_device'
-        return
-      }
-
       set({ user: session.user, profile, loading: false })
     } else {
       set({ loading: false })
@@ -92,30 +78,10 @@ const useAuthStore = create((set, get) => ({
       password,
     })
     if (error) throw error
-
-    // Write new session ID — kicks out other devices
-    const sessionId = crypto.randomUUID()
-    setLocalSession(sessionId)
-
-    if (data.user) {
-      await supabase
-        .from('profiles')
-        .update({ session_id: sessionId })
-        .eq('id', data.user.id)
-    }
-
     return data
   },
 
   logout: async () => {
-    clearLocalSession()
-    const user = get().user
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({ session_id: null })
-        .eq('id', user.id)
-    }
     await supabase.auth.signOut()
     set({ user: null, profile: null })
   },
