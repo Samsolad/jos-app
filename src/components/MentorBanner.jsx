@@ -35,44 +35,48 @@ const MODE_STYLES = {
   },
 }
 
+const DEFAULT_MODE = MODE_STYLES.pa
+
 export default function MentorBanner() {
-  const { message, situation, visible, actions, dismiss } = useMentorStore()
+  const message   = useMentorStore(s => s.message)
+  const situation = useMentorStore(s => s.situation)
+  const visible   = useMentorStore(s => s.visible)
+  const actions   = useMentorStore(s => s.actions)
+  const dismiss   = useMentorStore(s => s.dismiss)
+
   const spokenRef = useRef(null)
 
-  const mode = MODE_STYLES[situation] || MODE_STYLES.pa
+  // Safe mode lookup — never undefined
+  const mode = (situation && MODE_STYLES[situation])
+    ? MODE_STYLES[situation]
+    : DEFAULT_MODE
 
-  // Speak when message changes
   useEffect(() => {
     if (visible && message && message !== spokenRef.current) {
       spokenRef.current = message
-      speak(message, situation)
+      speak(message, situation || 'pa')
     }
-    if (!visible) {
-      window.speechSynthesis?.cancel()
+    if (!visible && window.speechSynthesis) {
+      window.speechSynthesis.cancel()
     }
   }, [visible, message, situation])
 
-  if (!visible) return null
+  if (!visible || !message) return null
 
   return (
     <div
-      className={`fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-24px)] max-w-[540px] bg-[#111] border border-[#2a2a2a] ${mode.border} border-t-2 rounded-lg shadow-2xl animate-fadeUp`}
+      className={`fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-24px)] max-w-[540px] bg-[#111] border border-[#2a2a2a] border-t-2 ${mode.border} rounded-lg shadow-2xl animate-fadeUp`}
     >
       <div className="flex items-start gap-3 p-4">
-        {/* Indicator dot */}
         <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${mode.dot}`} />
-
         <div className="flex-1 min-w-0">
-          {/* Label */}
           <p className={`text-[9px] tracking-[0.18em] uppercase font-semibold mb-1 ${mode.label}`}>
             {mode.text}
           </p>
-          {/* Message */}
           <p className="text-[13px] text-[#e8e8e8] font-light leading-relaxed">
             {message}
           </p>
-          {/* Action buttons */}
-          {actions?.length > 0 && (
+          {actions && actions.length > 0 && (
             <div className="flex gap-2 mt-3 flex-wrap">
               {actions.map((a, i) => (
                 <button
@@ -86,8 +90,6 @@ export default function MentorBanner() {
             </div>
           )}
         </div>
-
-        {/* Dismiss */}
         <button
           onClick={dismiss}
           className="text-[#444] hover:text-[#888] text-[14px] flex-shrink-0 transition-colors"
