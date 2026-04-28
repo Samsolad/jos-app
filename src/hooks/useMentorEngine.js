@@ -5,6 +5,8 @@ import useProjectStore from '../store/projectStore'
 import useGoalStore from '../store/goalStore'
 import useHabitStore from '../store/habitStore'
 import useMentorStore from '../store/mentorStore'
+import { getNextAction } from '../lib/scoring'
+import useTaskStore from '../store/taskStore'
 
 const IDLE_THRESHOLD_MS  = 20 * 60 * 1000  // 20 minutes
 const IDLE_COOLDOWN_MS   = 30 * 60 * 1000  // 30 minutes between idle nudges
@@ -18,6 +20,7 @@ export default function useMentorEngine() {
   const { goals }    = useGoalStore()
   const { habits, isLoggedToday } = useHabitStore()
   const { trigger }  = useMentorStore()
+  const { tasks } = useTaskStore()
 
   const lastActivity   = useRef(Date.now())
   const lastIdleNudge  = useRef(0)
@@ -47,17 +50,23 @@ export default function useMentorEngine() {
 
       if (idleMins >= 20 && sinceLastNudge > IDLE_COOLDOWN_MS) {
         lastIdleNudge.current = Date.now()
-        const nextTask = projects
-          .flatMap(p => (p.tasks || [])
-            .filter(t => !t.done && !t.blocked)
-            .map(t => ({ ...t, proj: p.name }))
-          )[0]
+
+        // Use scoring engine to find actual next action
+        const projectsWithTasks = projects.map(p => ({
+          ...p,
+          tasks: tasks[p.id] || [],
+        }))
+        const nextAction = getNextAction(projectsWithTasks)
 
         await trigger(
           'idle',
-          { minutes: idleMins, task: nextTask?.text },
+          {
+            minutes: idleMins,
+            task:    nextAction?.task?.text || null,
+            project: nextAction?.project?.name || null,
+          },
           profile,
-          nextTask
+          nextAction
             ? [{ label: 'Open Work', fn: () => navigate('/projects') }]
             : [],
         )

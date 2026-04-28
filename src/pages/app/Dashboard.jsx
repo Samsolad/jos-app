@@ -9,6 +9,8 @@ import Badge from '../../components/ui/Badge'
 import RemindersPanel from '../../components/RemindersPanel'
 import useReminderStore from '../../store/reminderStore'
 import useMentorStore from '../../store/mentorStore'
+import useTaskStore from '../../store/taskStore'
+import NextAction from '../../components/NextAction'
 
 function StatBox({ label, value, color = 'white', sub }) {
   const colors = {
@@ -37,42 +39,33 @@ function SectionTitle({ children }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const { projects, fetchProjects } = useProjectStore()
+  const { projects, fetchProjects }  = useProjectStore()
+  const { fetchTasks }               = useTaskStore()
   const { goals, fetchGoals } = useGoalStore()
   const { habits, logs, fetchHabits, isLoggedToday } = useHabitStore()
   const { entries, fetchEntries, getTotals } = useRevenueStore()
   const { fetchReminders } = useReminderStore()
   const { trigger } = useMentorStore()
   
+  
 
   useEffect(() => {
-    fetchProjects()
-    fetchGoals()
-    fetchHabits()
-    fetchEntries()
-    fetchReminders()
-
-    // Morning briefing — fires once per day between 6am and 11am
-    const hour = new Date().getHours()
-    const morningKey = `morning_${new Date().toDateString()}`
-    const alreadyFired = sessionStorage.getItem(morningKey)
-
-    if (hour >= 6 && hour < 11 && !alreadyFired && profile) {
-      sessionStorage.setItem(morningKey, '1')
-      setTimeout(async () => {
-        const name = profile.name?.split(' ')[0] || 'there'
-        await trigger(
-          'pa',
-          { task: `Good morning ${name}. Your OS is ready. Check your priorities and start strong.` },
-          profile,
-          [
-            { label: 'View Projects', fn: () => navigate('/projects') },
-            { label: 'View Goals',    fn: () => navigate('/goals') },
-          ],
-        )
-      }, 2000)
+    const loadAll = async () => {
+      await fetchProjects()
+      fetchGoals()
+      fetchHabits()
+      fetchEntries()
+      fetchReminders()
     }
+    loadAll()
   }, [profile])
+
+  // Load tasks for all projects once projects are fetched
+  useEffect(() => {
+    if (projects.length > 0) {
+      projects.forEach(p => fetchTasks(p.id))
+    }
+  }, [projects.length])
 
   const firstName = profile?.name?.split(' ')[0] || 'there'
   const hour = new Date().getHours()
@@ -115,7 +108,10 @@ export default function Dashboard() {
         <p className="text-[13px] text-[#888] font-light mb-6">Here is everything across your OS.</p>
       )}
 
-      <div className="h-px bg-[#1f1f1f] mb-6" />
+<div className="h-px bg-[#1f1f1f] mb-6" />
+
+{/* Next Action — the most important thing right now */}
+<NextAction />
 
 {/* Reminders & Meetings */}
 <div className="mb-8">
@@ -288,31 +284,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* Motivate Me */}
-      <div className="mt-6">
-        <button
-          onClick={async (e) => {
-            // Unlock iOS audio directly in the tap handler
-            if (window.speechSynthesis) {
-              window.speechSynthesis.cancel()
-              const unlock = new SpeechSynthesisUtterance(' ')
-              unlock.volume = 0.01
-              window.speechSynthesis.speak(unlock)
-            }
-            await trigger(
-              'motivate',
-              {
-                projects: projects.map(p => p.name).join(', '),
-                goals: goals.filter(g => !g.done).map(g => g.text).join('; '),
-              },
-              profile,
-            )
-          }}
-          className="text-[11px] font-semibold tracking-[0.1em] uppercase text-[#444] border border-[#1f1f1f] rounded px-4 py-2 hover:border-[#2a2a2a] hover:text-[#888] transition-all"
-        >
-          ⚡ Motivate Me
-        </button>
-      </div>
     </div>
   )
 }
