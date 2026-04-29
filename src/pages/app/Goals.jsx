@@ -280,30 +280,30 @@ Rules:
     const plan = session.agreedPlan || session.proposal
 
     const steps = plan.steps.map(s => ({
-      text: s.text,
+      text:      s.text,
       timeframe: s.timeframe || '',
-      budget: s.budget || '',
+      budget:    s.budget    || '',
     }))
 
     const deadline = calcDeadline(plan.timeline)
 
     if (session.editingGoalId) {
       await updateGoal(session.editingGoalId, {
-        timeline: plan.timeline || '',
-        budget: plan.total_budget || '',
+        timeline:     plan.timeline       || '',
+        budget:       plan.total_budget   || '',
         deadline,
-        reasoning: session.proposal.reasoning || '',
+        reasoning:    session.proposal.reasoning || '',
         chat_history: session.chatHistory,
       })
       await updateGoalSteps(session.editingGoalId, steps)
     } else {
       await addGoal({
-        text: session.goalText,
-        category: session.category,
+        text:         session.goalText,
+        category:     session.category,
         deadline,
-        timeline: plan.timeline || '',
-        budget: plan.total_budget || '',
-        reasoning: session.proposal.reasoning || '',
+        timeline:     plan.timeline     || '',
+        budget:       plan.total_budget || '',
+        reasoning:    session.proposal.reasoning || '',
         chat_history: session.chatHistory,
         steps,
       })
@@ -311,36 +311,36 @@ Rules:
 
     // Auto-create reminders for each step
     const baseDate = new Date()
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i]
-      if (!step.text) continue
+    const totalDays = deadline
+      ? Math.ceil((new Date(deadline) - new Date()) / 86400000)
+      : 90
 
-      // Space steps evenly across the timeline
-      const totalDays = deadline
-        ? Math.ceil((new Date(deadline) - new Date()) / 86400000)
-        : 90
+    for (let i = 0; i < steps.length; i++) {
+      if (!steps[i].text) continue
       const spacing = Math.floor(totalDays / steps.length)
       const reminderDate = new Date(baseDate)
       reminderDate.setDate(reminderDate.getDate() + spacing * (i + 1))
-      reminderDate.setHours(9, 0, 0, 0) // 9am
-
+      reminderDate.setHours(9, 0, 0, 0)
       await addReminder({
-        title: `Goal step: ${step.text}`,
+        title:    `Goal step: ${steps[i].text}`,
         datetime: reminderDate.toISOString().slice(0, 16),
-        notes: `Part of goal: ${session.goalText}${step.timeframe ? ` · ${step.timeframe}` : ''}`,
-        type: 'reminder',
+        notes:    `Part of goal: ${session.goalText}${steps[i].timeframe ? ' · ' + steps[i].timeframe : ''}`,
+        type:     'reminder',
         duration: 60,
       })
     }
 
-    // Reset
+    // Reset session
     setSession(null)
     setPlanStep('idle')
     setGoalText('')
     setGoalCat('Career')
     setGoalCtx('')
 
-    // Mentor celebrate
+    // Force fresh fetch from Supabase so steps appear immediately
+    await fetchGoals()
+
+    // Celebrate
     await trigger('celebrate', { item: session.goalText }, profile)
   }
 

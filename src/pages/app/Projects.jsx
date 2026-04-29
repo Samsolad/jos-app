@@ -20,6 +20,7 @@ export default function Projects() {
   const [newStatus, setNewStatus] = useState('Active')
   const [newNotes, setNewNotes] = useState('')
   const [newTask, setNewTask] = useState('')
+  const [newTaskDate, setNewTaskDate] = useState('')
   const [updatingTask, setUpdatingTask] = useState(null)
 
   useEffect(() => { fetchProjects() }, [])
@@ -50,8 +51,9 @@ export default function Projects() {
 
   const handleAddTask = async () => {
     if (!newTask.trim() || !activeId) return
-    await addTask(activeId, newTask.trim())
+    await addTask(activeId, newTask.trim(), newTaskDate || null)
     setNewTask('')
+    setNewTaskDate('')
   }
 
   const handleApplyAIChanges = async (actions) => {
@@ -256,17 +258,23 @@ export default function Projects() {
       ))}
 
       {/* Add task */}
-      <div className="flex gap-2 mt-4 items-end">
-        <div className="flex-1">
+      <div className="mt-4">
+        <div className="flex gap-2 mb-2">
           <input
-            className="w-full bg-[#111] border border-[#2a2a2a] rounded py-2.5 px-4 text-white text-[13px] font-light outline-none focus:border-[#333] placeholder:text-[#444]"
+            className="flex-1 bg-[#111] border border-[#2a2a2a] rounded py-2.5 px-4 text-white text-[13px] font-light outline-none focus:border-[#333] placeholder:text-[#444]"
             placeholder="Add task…"
             value={newTask}
             onChange={e => setNewTask(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddTask()}
           />
+          <input
+            type="date"
+            className="bg-[#111] border border-[#2a2a2a] rounded py-2.5 px-3 text-[#888] text-[13px] font-light outline-none focus:border-[#333] w-[140px]"
+            value={newTaskDate}
+            onChange={e => setNewTaskDate(e.target.value)}
+          />
         </div>
-        <Button variant="ghost" size="sm" onClick={handleAddTask}>+ Add</Button>
+        <Button variant="ghost" size="sm" onClick={handleAddTask}>+ Add Task</Button>
       </div>
     </div>
   )

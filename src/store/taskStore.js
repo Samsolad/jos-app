@@ -14,18 +14,19 @@ const useTaskStore = create((set, get) => ({
     set(s => ({ tasks: { ...s.tasks, [projectId]: data || [] } }))
   },
 
-  addTask: async (projectId, text) => {
+  addTask: async (projectId, text, dueDate = null) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
-    const current = get().tasks[projectId] || []
+    const current  = get().tasks[projectId] || []
     const position = current.length
     const { data } = await supabase
       .from('tasks')
       .insert({
         project_id: projectId,
-        user_id: user.id,
+        user_id:    user.id,
         text,
         position,
+        due_date:   dueDate || null,
       })
       .select()
       .single()
