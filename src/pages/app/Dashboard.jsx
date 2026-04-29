@@ -10,7 +10,8 @@ import RemindersPanel from '../../components/RemindersPanel'
 import useReminderStore from '../../store/reminderStore'
 import useMentorStore from '../../store/mentorStore'
 import useTaskStore from '../../store/taskStore'
-import NextAction from '../../components/NextAction'
+import useFocusStore from '../../store/focusStore'
+import DailyFocus from '../../components/DailyFocus'
 
 function StatBox({ label, value, color = 'white', sub }) {
   const colors = {
@@ -46,26 +47,38 @@ export default function Dashboard() {
   const { entries, fetchEntries, getTotals } = useRevenueStore()
   const { fetchReminders } = useReminderStore()
   const { trigger } = useMentorStore()
+  const { loadFocus, refresh } = useFocusStore()
   
   
 
   useEffect(() => {
     const loadAll = async () => {
       await fetchProjects()
-      fetchGoals()
-      fetchHabits()
-      fetchEntries()
+      await fetchGoals()
+      await fetchHabits()
+      await fetchEntries()
       fetchReminders()
     }
     loadAll()
   }, [profile])
 
-  // Load tasks for all projects once projects are fetched
+  // Load tasks once projects are ready
   useEffect(() => {
     if (projects.length > 0) {
       projects.forEach(p => fetchTasks(p.id))
     }
   }, [projects.length])
+
+  // Generate daily focus once all data is loaded
+  useEffect(() => {
+    if (
+      profile &&
+      projects.length >= 0 &&
+      goals.length >= 0
+    ) {
+      loadFocus(profile, projects, goals, habits, entries)
+    }
+  }, [profile?.id, projects.length, goals.length])
 
   const firstName = profile?.name?.split(' ')[0] || 'there'
   const hour = new Date().getHours()
@@ -110,15 +123,15 @@ export default function Dashboard() {
 
 <div className="h-px bg-[#1f1f1f] mb-6" />
 
-{/* Next Action — the most important thing right now */}
-<NextAction />
+      {/* AI-generated daily focus — automatic, no input needed */}
+      <DailyFocus />
 
-{/* Reminders & Meetings */}
-<div className="mb-8">
-  <RemindersPanel />
-</div>
+      {/* Reminders & Meetings */}
+      <div className="mb-4">
+        <RemindersPanel />
+      </div>
 
-{/* Key stats */}
+      {/* Key stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-8">
         <StatBox label="Projects" value={projects.length} sub={`${activeProjects.length} active`} />
         <StatBox
