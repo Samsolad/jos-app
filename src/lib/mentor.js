@@ -1,3 +1,5 @@
+import { askClaude } from './claude'
+
 // ── PERSONALITIES ─────────────────────────────────────────────────
 const TONES = {
   tough: `You are a tough-love accountability coach. Direct, no fluff. Call them out. Max 2 sentences. No cruelty but no sugarcoating.`,
@@ -86,7 +88,6 @@ export async function mentorMessage(sit, context, profile) {
   }
 
   try {
-    const { askClaude } = await import('./claude')
     const reply = await askClaude(
       [{ role: 'user', content: prompt }],
       sys,
