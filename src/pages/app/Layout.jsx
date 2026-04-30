@@ -14,6 +14,7 @@ const NAV = [
   { to: '/revenue', icon: '⊘', label: 'Money'  },
   { to: '/family',  icon: '⊗', label: 'Family' },
   { to: '/chat',    icon: '⊛', label: 'AI'     },
+  { to: '/investors', icon: '◎', label: 'Invest' },
 ]
 
 const MOBILE_NAV = [
@@ -30,6 +31,7 @@ const MORE_ITEMS = [
   { to: '/revenue', icon: '⊘', label: 'Money'   },
   { to: '/family',  icon: '⊗', label: 'Family'  },
   { to: '/profile', icon: '⊙', label: 'Profile' },
+  { to: '/investors', icon: '◎', label: 'Invest' },
 ]
 
 const SECTION_NAMES = {

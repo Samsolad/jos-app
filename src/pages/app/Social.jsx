@@ -6,6 +6,7 @@ import useGoalStore from '../../store/goalStore'
 import { askClaude } from '../../lib/claude'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
+import { generateQuoteCard } from '../../lib/cardGenerator'
 
 const ALL_PLATFORMS = [
   { name: 'LinkedIn',   icon: '💼', needsCopy: false, hasImage: false, connectUrl: 'https://www.linkedin.com' },
@@ -95,6 +96,21 @@ export default function Social() {
     const saved = await savePost(activePlat, reply, false)
     if (saved) setSavedId(saved.id)
   }
+// Auto-generate image card for visual platforms
+if (activePlatInfo?.hasImage) {
+  try {
+    const cardStyle = activePlat === 'Instagram' ? 'warm' : 'dark'
+    const cardDataUrl = generateQuoteCard({
+      text: reply.split('\n')[0].replace(/#\w+/g, '').trim().slice(0, 120),
+      name: profile?.name || 'Sam Oladeinde',
+      handle: `@${(profile?.name || 'sam oladeinde').toLowerCase().replace(/\s+/g, '_')}`,
+      style: cardStyle,
+    })
+    setGeneratedImg(cardDataUrl)
+  } catch (e) {
+    console.warn('Card generation failed:', e)
+  }
+}
 
   // ── Copy ──────────────────────────────────────────────────────
   const handleCopy = () => {
@@ -111,19 +127,22 @@ export default function Social() {
     setGeneratedImg(null)
     setImgError(false)
 
-    const promptText = [
-      `Professional social media visual for ${activePlat}.`,
-      `Context: ${draft.slice(0, 120)}.`,
-      `Style: modern, clean, minimal dark background.`,
-      `No text overlay. No watermark.`,
-    ].join(' ')
-
-    const encoded = encodeURIComponent(promptText)
-    const seed    = Math.floor(Math.random() * 999999)
-    const url     = `https://image.pollinations.ai/prompt/${encoded}?width=1080&height=1080&nologo=true&seed=${seed}`
-
-    setGeneratedImg(url)
-    setGeneratingImg(false)
+    try {
+      const styles = ['dark', 'light', 'warm']
+      const style  = styles[Math.floor(Math.random() * styles.length)]
+      const firstLine = draft.split('\n')[0].replace(/#\w+/g, '').trim().slice(0, 120)
+      const card = generateQuoteCard({
+        text:   firstLine,
+        name:   profile?.name || 'Sam Oladeinde',
+        handle: `@${(profile?.name || 'sam oladeinde').toLowerCase().replace(/\s+/g, '_')}`,
+        style,
+      })
+      setGeneratedImg(card)
+      setGeneratingImg(false)
+    } catch (e) {
+      setImgError(true)
+      setGeneratingImg(false)
+    }
   }
 
   // ── Mark posted ───────────────────────────────────────────────

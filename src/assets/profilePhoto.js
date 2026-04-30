@@ -1,0 +1,1 @@
+export const PROFILE_PHOTO = null // will be replaced

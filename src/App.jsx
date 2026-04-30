@@ -13,6 +13,7 @@ import Social from './pages/app/Social'
 import Family from './pages/app/Family'
 import Chat from './pages/app/Chat'
 import Profile from './pages/app/Profile'
+import Investors from './pages/app/Investors'
 
 function Spinner() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="family" element={<Family />} />
           <Route path="chat" element={<Chat />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="investors" element={<Investors />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
