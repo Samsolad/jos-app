@@ -31,7 +31,16 @@ export default function Login() {
       await login(email, password)
       navigate('/')
     } catch (err) {
-      setError(err.message || 'Invalid email or password.')
+      const msg = err?.message || ''
+      if (msg.includes('Invalid login credentials')) {
+        setError(
+          'Wrong email or password. If you just registered, open the confirmation email from Supabase first, then try again.',
+        )
+      } else if (msg.includes('Email not confirmed')) {
+        setError('Please confirm your email using the link we sent you, then sign in.')
+      } else {
+        setError(msg || 'Sign-in failed.')
+      }
     }
     setLoading(false)
   }

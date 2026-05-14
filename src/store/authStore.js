@@ -1,5 +1,25 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
+
+async function ensureProfileRow(user, nameHint) {
+  const name =
+    nameHint ||
+    user.user_metadata?.name ||
+    user.email?.split('@')[0] ||
+    'User'
+  const { data: created, error: insertErr } = await supabase
+    .from('profiles')
+    .insert({ id: user.id, name })
+    .select()
+    .single()
+  if (!insertErr && created) return created
+  if (insertErr) {
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    if (data) return data
+    console.warn('[auth] Could not create or load profile:', insertErr.message)
+  }
+  return null
+}
 
 const useAuthStore = create((set, get) => ({
   user:    null,
@@ -14,7 +34,8 @@ const useAuthStore = create((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession()
 
     if (session?.user) {
-      const profile = await get().fetchProfile(session.user.id)
+      let profile = await get().fetchProfile(session.user.id)
+      if (!profile) profile = await ensureProfileRow(session.user)
       set({ user: session.user, profile, loading: false })
     } else {
       set({ loading: false })
@@ -22,7 +43,8 @@ const useAuthStore = create((set, get) => ({
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const profile = await get().fetchProfile(session.user.id)
+        let profile = await get().fetchProfile(session.user.id)
+        if (!profile) profile = await ensureProfileRow(session.user)
         set({ user: session.user, profile })
       } else {
         set({ user: null, profile: null })
@@ -55,21 +77,49 @@ const useAuthStore = create((set, get) => ({
   },
 
   register: async (name, email, password) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error('App is missing Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.')
+    }
+    const trimmedEmail = email.trim()
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: trimmedEmail,
       password,
-      options: { data: { name } },
+      options: { data: { name: name.trim() } },
     })
     if (error) throw error
+    if (!data.user) throw new Error('Registration did not return a user. Check your Supabase Auth settings.')
+
+    if (!data.session) {
+      const err = new Error(
+        'Account created. Check your email and open the confirmation link, then sign in here.',
+      )
+      err.code = 'EMAIL_CONFIRMATION_REQUIRED'
+      throw err
+    }
+
+    let profile = await get().fetchProfile(data.user.id)
+    if (!profile) profile = await ensureProfileRow(data.user, name.trim())
+    set({ user: data.user, profile })
     return data
   },
 
   login: async (email, password) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error('App is missing Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.')
+    }
+    const trimmedEmail = email.trim()
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: trimmedEmail,
       password,
     })
     if (error) throw error
+    if (!data.user) {
+      throw new Error('Sign-in did not return a user. Check Supabase Auth and try again.')
+    }
+
+    let profile = await get().fetchProfile(data.user.id)
+    if (!profile) profile = await ensureProfileRow(data.user)
+    set({ user: data.user, profile })
     return data
   },
 

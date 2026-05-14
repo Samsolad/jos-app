@@ -24,7 +24,11 @@ export default function Register() {
       await register(name.trim(), email, password)
       navigate('/')
     } catch (err) {
-      setError(err.message || 'Registration failed.')
+      if (err?.code === 'EMAIL_CONFIRMATION_REQUIRED') {
+        setError(err.message)
+      } else {
+        setError(err?.message || 'Registration failed.')
+      }
     }
     setLoading(false)
   }
