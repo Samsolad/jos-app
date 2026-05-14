@@ -60,6 +60,34 @@ export default function Profile() {
           </div>
         </div>
 
+{/* Profile photo */}
+<div className="flex flex-col items-center gap-2">
+            {(() => {
+              const saved = localStorage.getItem('jos_profile_photo')
+              return saved
+                ? <img src={saved} alt="Profile" className="w-14 h-14 rounded-full object-cover border border-[#2a2a2a]" />
+                : <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-[20px] font-bold text-[#080808]">{initials}</div>
+            })()}
+            <label className="cursor-pointer text-[10px] text-[#444] underline hover:text-[#888] transition-colors">
+              {localStorage.getItem('jos_profile_photo') ? 'Change photo' : 'Add photo'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = (ev) => {
+                    localStorage.setItem('jos_profile_photo', ev.target.result)
+                    window.location.reload() // refresh to show new photo
+                  }
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </label>
+          </div>
+          
         {!editingInfo ? (
           <Button variant="ghost" size="sm" onClick={() => setEditingInfo(true)}>Edit Info</Button>
         ) : (

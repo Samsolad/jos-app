@@ -1,6 +1,6 @@
 import Button from './ui/Button'
 
-export default function TaskItem({ task, index, onToggle, onUpdate, onDelete }) {
+export default function TaskItem({ task, onToggle, onUpdate, onDelete }) {
   const statusColor = task.blocked
     ? 'border-[#f59e0b] bg-[#f59e0b1f]'
     : task.done

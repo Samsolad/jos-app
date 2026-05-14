@@ -24,7 +24,7 @@ export default function Revenue() {
     setShowAdd(false)
   }
 
-  const { inn, out, net } = getTotals(entries)
+    const { inn, out } = getTotals(entries)
 
   // Revenue
   const savings = entries.filter(e => e.type === 'savings').reduce((s, e) => s + Number(e.amount), 0)

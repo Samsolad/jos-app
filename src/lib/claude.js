@@ -1,3 +1,4 @@
+/** @deprecated Use `askLLM` from `./llm` (Google Gemini). Kept for reference only. */
 const CLAUDE_KEY = import.meta.env.VITE_ANTHROPIC_KEY
 
 export async function askClaude(messages, system = '', json = false) {

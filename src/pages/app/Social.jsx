@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import useSocialStore from '../../store/socialStore'
 import useAuthStore from '../../store/authStore'
 import useProjectStore from '../../store/projectStore'
 import useGoalStore from '../../store/goalStore'
-import { askClaude } from '../../lib/claude'
+import { askLLM } from '../../lib/llm'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import { generateQuoteCard } from '../../lib/cardGenerator'
@@ -52,21 +52,21 @@ export default function Social() {
   const [generatingImg,   setGeneratingImg]   = useState(false)
   const [generatedImg,    setGeneratedImg]    = useState(null)
   const [imgError,        setImgError]        = useState(false)
+  const profilePhotoData = useMemo(
+    () => localStorage.getItem('jos_profile_photo') || null,
+    [],
+  )
 
   useEffect(() => { fetchPosts() }, [])
 
-  useEffect(() => {
-    if (platforms.length > 0 && !activePlat) {
-      setActivePlat(platforms[0].platform)
-    }
-  }, [platforms])
+  const effectivePlat = activePlat || platforms[0]?.platform || ''
 
   const postedToday    = getPostedToday()
-  const activePlatInfo = ALL_PLATFORMS.find(p => p.name === activePlat) || null
+  const activePlatInfo = ALL_PLATFORMS.find(p => p.name === effectivePlat) || null
 
   // ── Draft ─────────────────────────────────────────────────────
   const handleDraft = async () => {
-    if (!activePlat) return
+    if (!effectivePlat) return
     setDrafting(true)
     setDraft('')
     setSavedId(null)
@@ -80,37 +80,46 @@ export default function Social() {
       `About them: ${profile?.about || 'building their business'}.`,
       `Active projects: ${projects.map(p => p.name).join(', ') || 'various'}.`,
       `Goals: ${goals.filter(g => !g.done).slice(0, 2).map(g => g.text).join('; ') || 'growing their business'}.`,
-      getPlatformPrompt(activePlat),
+      getPlatformPrompt(effectivePlat),
       'Write in first person. Authentic, not corporate.',
       'Rotate themes across days: project update, personal insight, behind-the-scenes, community moment.',
     ].join(' ')
 
-    const reply = await askClaude(
-      [{ role: 'user', content: `Write a ${activePlat} post for today ${new Date().toDateString()}.` }],
+    const reply = await askLLM(
+      [{ role: 'user', content: `Write a ${effectivePlat} post for today ${new Date().toDateString()}.` }],
       sys,
     )
 
     setDraft(reply)
     setDrafting(false)
 
-    const saved = await savePost(activePlat, reply, false)
+    const saved = await savePost(effectivePlat, reply, false)
     if (saved) setSavedId(saved.id)
+
+    // Auto-generate image card for visual platforms
+    if (activePlatInfo?.hasImage) {
+      try {
+        const lines = reply
+          .split('\n')
+          .map(l => l.replace(/#\w+/g, '').trim())
+          .filter(l => l.length > 20 && !l.startsWith('@') && !l.startsWith('http'))
+        const bestLine = lines.sort((a, b) => b.length - a.length)[0] || reply.slice(0, 160)
+        const cardText = bestLine.slice(0, 180)
+
+        const cardStyle = effectivePlat === 'Instagram' ? 'warm' : 'dark'
+        const cardDataUrl = generateQuoteCard({
+          text:   cardText,
+          name:   profile?.name || 'Sam Oladeinde',
+          handle: `@${(profile?.name || 'sam_oladeinde').toLowerCase().replace(/\s+/g, '_')}`,
+          profilePhoto: profilePhotoData,
+          style:  cardStyle,
+        })
+        setGeneratedImg(cardDataUrl)
+      } catch (e) {
+        console.warn('Card generation failed:', e)
+      }
+    }
   }
-// Auto-generate image card for visual platforms
-if (activePlatInfo?.hasImage) {
-  try {
-    const cardStyle = activePlat === 'Instagram' ? 'warm' : 'dark'
-    const cardDataUrl = generateQuoteCard({
-      text: reply.split('\n')[0].replace(/#\w+/g, '').trim().slice(0, 120),
-      name: profile?.name || 'Sam Oladeinde',
-      handle: `@${(profile?.name || 'sam oladeinde').toLowerCase().replace(/\s+/g, '_')}`,
-      style: cardStyle,
-    })
-    setGeneratedImg(cardDataUrl)
-  } catch (e) {
-    console.warn('Card generation failed:', e)
-  }
-}
 
   // ── Copy ──────────────────────────────────────────────────────
   const handleCopy = () => {
@@ -139,7 +148,7 @@ if (activePlatInfo?.hasImage) {
       })
       setGeneratedImg(card)
       setGeneratingImg(false)
-    } catch (e) {
+    } catch {
       setImgError(true)
       setGeneratingImg(false)
     }
@@ -150,7 +159,7 @@ if (activePlatInfo?.hasImage) {
     if (savedId) {
       await markPosted(savedId)
     } else {
-      const saved = await savePost(activePlat, draft, true)
+      const saved = await savePost(effectivePlat, draft, true)
       if (saved) setSavedId(saved.id)
     }
     setDraft('')
@@ -270,7 +279,7 @@ if (activePlatInfo?.hasImage) {
                   setGeneratedImg(null)
                 }}
                 className={`px-3 sm:px-4 py-2 text-[11px] font-semibold tracking-[0.1em] uppercase rounded border transition-all ${
-                  activePlat === p.platform
+                  effectivePlat === p.platform
                     ? 'bg-white text-[#080808] border-white'
                     : 'bg-transparent text-[#444] border-[#2a2a2a] hover:border-[#333] hover:text-[#888]'
                 }`}
@@ -291,7 +300,7 @@ if (activePlatInfo?.hasImage) {
           {activePlatInfo?.needsCopy && (
             <div className="mb-4 px-4 py-2.5 bg-[#f59e0b]/[0.06] border border-[#f59e0b]/20 rounded-md flex items-center justify-between gap-3">
               <p className="text-[12px] text-[#fbbf24] font-light">
-                {activePlat} uses copy and paste — direct posting not available.
+                {effectivePlat} uses copy and paste — direct posting not available.
               </p>
               <a
                 href={activePlatInfo.connectUrl}
@@ -299,7 +308,7 @@ if (activePlatInfo?.hasImage) {
                 rel="noreferrer"
                 className="text-[11px] text-[#fbbf24] underline whitespace-nowrap hover:text-[#fde68a] transition-colors"
               >
-                Open {activePlat} ↗
+                Open {effectivePlat} ↗
               </a>
             </div>
           )}
@@ -324,8 +333,8 @@ if (activePlatInfo?.hasImage) {
             <div className="bg-[#111] border border-[#1f1f1f] rounded-md p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[10px] tracking-[0.16em] uppercase text-[#444] font-medium">
-                  {activePlat} Draft
-                  {postedToday.includes(activePlat) && (
+                  {effectivePlat} Draft
+                  {postedToday.includes(effectivePlat) && (
                     <span className="ml-2 text-[#4ade80]">· Posted today ✓</span>
                   )}
                 </p>
@@ -347,7 +356,7 @@ if (activePlatInfo?.hasImage) {
                     ))}
                   </div>
                   <p className="text-[12px] text-[#444] font-light">
-                    Drafting for {activePlat}…
+                    Drafting for {effectivePlat}…
                   </p>
                 </div>
               )}
@@ -374,7 +383,7 @@ if (activePlatInfo?.hasImage) {
                           rel="noreferrer"
                         >
                           <Button variant="ghost" size="sm">
-                            Open {activePlat} ↗
+                            Open {effectivePlat} ↗
                           </Button>
                         </a>
                         <Button variant="muted" size="sm" onClick={handleMarkPosted}>
@@ -453,7 +462,7 @@ if (activePlatInfo?.hasImage) {
 
                       {!generatedImg && !generatingImg && !imgError && (
                         <p className="text-[12px] text-[#444] font-light">
-                          Generate a free AI image to go with your {activePlat} post.
+                          Generate a free AI image to go with your {effectivePlat} post.
                         </p>
                       )}
                     </div>
@@ -465,10 +474,10 @@ if (activePlatInfo?.hasImage) {
               {!drafting && !draft && (
                 <div className="py-8 text-center">
                   <p className="text-[13px] text-[#444] font-light mb-4">
-                    Generate a personalised {activePlat} post using your real projects and goals.
+                    Generate a personalised {effectivePlat} post using your real projects and goals.
                   </p>
                   <Button variant="solid" size="md" onClick={handleDraft}>
-                    ✦ Generate {activePlat} Post
+                    ✦ Generate {effectivePlat} Post
                   </Button>
                 </div>
               )}
@@ -478,14 +487,14 @@ if (activePlatInfo?.hasImage) {
           {/* ── History tab ── */}
           {tab === 'history' && (
             <div>
-              {posts.filter(p => p.platform === activePlat).length === 0 && (
+              {posts.filter(p => p.platform === effectivePlat).length === 0 && (
                 <p className="text-[13px] text-[#444] font-light text-center py-8">
-                  No posts logged for {activePlat} yet.
+                  No posts logged for {effectivePlat} yet.
                 </p>
               )}
               <div className="space-y-2">
                 {posts
-                  .filter(p => p.platform === activePlat)
+                  .filter(p => p.platform === effectivePlat)
                   .map(p => (
                     <div
                       key={p.id}

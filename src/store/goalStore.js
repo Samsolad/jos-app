@@ -117,6 +117,13 @@ const useGoalStore = create((set, get) => ({
           g.id === goalId ? { ...g, goal_steps: data || [] } : g
         )
       }))
+    } else {
+      // Steps cleared — update local state to reflect empty array
+      set(s => ({
+        goals: s.goals.map(g =>
+          g.id === goalId ? { ...g, goal_steps: [] } : g
+        )
+      }))
     }
   },
 }))

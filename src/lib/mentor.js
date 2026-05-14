@@ -1,4 +1,4 @@
-import { askClaude } from './claude'
+import { askLLM } from './llm'
 
 // ── PERSONALITIES ─────────────────────────────────────────────────
 const TONES = {
@@ -67,7 +67,7 @@ export async function mentorMessage(sit, context, profile) {
   const sys         = TONES[personality] || TONES.pa
   const name        = prof?.name?.split(' ')[0] || 'there'
 
-  let prompt = ''
+  let prompt
 
   if (safeSit === 'next_task') {
     prompt = `${name} just completed a task. Their next task is: "${ctx.task || 'unknown'}" on project "${ctx.project || 'unknown'}". Tell them what is next and push them to start immediately.`
@@ -88,7 +88,7 @@ export async function mentorMessage(sit, context, profile) {
   }
 
   try {
-    const reply = await askClaude(
+    const reply = await askLLM(
       [{ role: 'user', content: prompt }],
       sys,
     )

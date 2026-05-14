@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Button from './ui/Button'
-import { askClaude } from '../lib/claude'
+import { askLLM } from '../lib/llm'
 
 export default function TaskUpdatePanel({ task, allTasks, projectName, onApply, onCancel }) {
   const [update, setUpdate] = useState('')
@@ -51,7 +51,7 @@ User's update:
 
 Analyse this and decide what to do with the task list.`
 
-    const parsed = await askClaude([{ role: 'user', content: prompt }], sys, true)
+    const parsed = await askLLM([{ role: 'user', content: prompt }], sys, true)
 
     setThinking(false)
 

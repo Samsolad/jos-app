@@ -104,6 +104,7 @@ const useTaskStore = create((set, get) => ({
       await supabase.from('tasks').delete().in('id', toDelete)
     }
     // Insert new tasks
+    const doneCount = current.filter(task => task.done).length
     const inserts = newTasks.map((t, i) => ({
       project_id: projectId,
       user_id: user.id,
@@ -111,7 +112,7 @@ const useTaskStore = create((set, get) => ({
       update_note: t.note || '',
       blocked: t.blocked || false,
       added_by_ai: true,
-      position: current.filter(t => t.done).length + i,
+      position: doneCount + i,
     }))
     if (inserts.length) {
       await supabase.from('tasks').insert(inserts)

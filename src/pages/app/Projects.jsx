@@ -214,11 +214,10 @@ export default function Projects() {
         <p className="text-[13px] text-[#444] font-light mb-4">No tasks yet. Add your first below.</p>
       )}
 
-      {projectTasks.map((t, i) => (
+      {projectTasks.map((t) => (
         <div key={t.id}>
           <TaskItem
             task={t}
-            index={i}
             onToggle={async () => {
   await toggleTask(activeId, t.id)
   const updated = tasks[activeId] || []

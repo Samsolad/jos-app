@@ -70,13 +70,6 @@ export default function RemindersPanel() {
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ` · ${timeStr}`
   }
 
-  const daysUntil = (iso) => {
-    const diff = Math.ceil((new Date(iso) - new Date()) / 86400000)
-    if (diff === 0) return 'today'
-    if (diff === 1) return 'tomorrow'
-    return `in ${diff}d`
-  }
-
   return (
     <div>
       <div className="flex items-center justify-between mb-3">

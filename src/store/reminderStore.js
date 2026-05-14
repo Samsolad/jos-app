@@ -46,14 +46,18 @@ const useReminderStore = create((set, get) => ({
   },
 
   toggleReminder: async (id) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     const updated = get().reminders.map(r => r.id === id ? { ...r, done: !r.done } : r)
-    await supabase.from('profiles').update({ reminders: updated }).eq('id', (await supabase.auth.getUser()).data.user?.id)
+    await supabase.from('profiles').update({ reminders: updated }).eq('id', user.id)
     set({ reminders: updated })
   },
 
   deleteReminder: async (id) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     const updated = get().reminders.filter(r => r.id !== id)
-    await supabase.from('profiles').update({ reminders: updated }).eq('id', (await supabase.auth.getUser()).data.user?.id)
+    await supabase.from('profiles').update({ reminders: updated }).eq('id', user.id)
     set({ reminders: updated })
   },
 

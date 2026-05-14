@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 import useProjectStore from '../store/projectStore'
@@ -8,7 +8,7 @@ import useMentorStore from '../store/mentorStore'
 import { getNextAction } from '../lib/scoring'
 import useTaskStore from '../store/taskStore'
 
-const IDLE_THRESHOLD_MS  = 20 * 60 * 1000  // 20 minutes
+const IDLE_MINUTES       = 20
 const IDLE_COOLDOWN_MS   = 30 * 60 * 1000  // 30 minutes between idle nudges
 const EOD_HOURS          = [17, 19, 21]     // 5pm, 7pm, 9pm
 const NO_ACTIVITY_HOURS  = [14, 16]         // 2pm, 4pm
@@ -22,9 +22,13 @@ export default function useMentorEngine() {
   const { trigger }  = useMentorStore()
   const { tasks } = useTaskStore()
 
-  const lastActivity   = useRef(Date.now())
+  const lastActivity   = useRef(null)
   const lastIdleNudge  = useRef(0)
   const firedToday     = useRef(new Set())
+
+  useLayoutEffect(() => {
+    lastActivity.current = Date.now()
+  }, [])
 
   // Track user activity
   useEffect(() => {
@@ -44,11 +48,11 @@ export default function useMentorEngine() {
       const fired   = firedToday.current
 
       // ── IDLE NUDGE ───────────────────────────────────────────
-      const idleMs   = Date.now() - lastActivity.current
+      const idleMs   = Date.now() - (lastActivity.current ?? Date.now())
       const idleMins = Math.floor(idleMs / 60000)
       const sinceLastNudge = Date.now() - lastIdleNudge.current
 
-      if (idleMins >= 20 && sinceLastNudge > IDLE_COOLDOWN_MS) {
+      if (idleMins >= IDLE_MINUTES && sinceLastNudge > IDLE_COOLDOWN_MS) {
         lastIdleNudge.current = Date.now()
 
         // Use scoring engine to find actual next action

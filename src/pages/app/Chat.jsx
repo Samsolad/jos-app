@@ -3,7 +3,7 @@ import useAuthStore from '../../store/authStore'
 import useProjectStore from '../../store/projectStore'
 import useGoalStore from '../../store/goalStore'
 import useHabitStore from '../../store/habitStore'
-import { askClaude } from '../../lib/claude'
+import { askLLM } from '../../lib/llm'
 import Button from '../../components/ui/Button'
 
 function buildSystem(profile, projects, goals, habits) {
@@ -82,7 +82,7 @@ export default function Chat() {
     setLoading(true)
 
     const sys = buildSystem(profile, projects, goals, habits)
-    const reply = await askClaude(updated.slice(-12), sys)
+    const reply = await askLLM(updated.slice(-12), sys)
 
     setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     setLoading(false)

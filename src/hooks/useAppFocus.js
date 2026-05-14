@@ -5,7 +5,6 @@ import useGoalStore     from '../store/goalStore'
 import useHabitStore    from '../store/habitStore'
 import useRevenueStore  from '../store/revenueStore'
 import useReminderStore from '../store/reminderStore'
-import useAuthStore     from '../store/authStore'
 import { supabase }     from '../lib/supabase'
 
 export default function useAppFocus() {
@@ -15,8 +14,6 @@ export default function useAppFocus() {
   const { fetchHabits }    = useHabitStore()
   const { fetchEntries }   = useRevenueStore()
   const { fetchReminders } = useReminderStore()
-  const { init }           = useAuthStore()
-
   useEffect(() => {
     let hiddenAt = null
 

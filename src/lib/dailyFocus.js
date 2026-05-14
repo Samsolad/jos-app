@@ -1,4 +1,4 @@
-import { askClaude } from './claude'
+import { askLLM } from './llm'
 
 export async function generateDailyFocus(profile, projects, goals, habits, entries) {
   if (!profile) return null
@@ -32,10 +32,7 @@ export async function generateDailyFocus(profile, projects, goals, habits, entri
       stepsLeft: (g.goal_steps || []).filter(s => !s.done).length,
     }))
 
-  const habitsDue = habits.filter(h => {
-    // Simple check — if no log today
-    return true
-  }).map(h => h.name)
+  const habitsDue = habits.filter(() => true).map(h => h.name)
 
   const revenueIn  = entries.filter(e => e.type === 'in').reduce((s, e)  => s + Number(e.amount), 0)
   const revenueOut = entries.filter(e => e.type === 'out').reduce((s, e) => s + Number(e.amount), 0)
@@ -95,6 +92,6 @@ REVENUE: £${revenueIn} in, £${revenueOut} out. Net: £${revenueIn - revenueOut
 USER ABOUT: ${profile.about || 'Not set'}
 `
 
-  const raw = await askClaude([{ role: 'user', content: prompt }], sys, true)
+  const raw = await askLLM([{ role: 'user', content: prompt }], sys, true)
   return raw
 }

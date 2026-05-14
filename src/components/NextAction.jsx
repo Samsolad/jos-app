@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useProjectStore from '../store/projectStore'
 import useTaskStore from '../store/taskStore'
@@ -13,51 +13,51 @@ export default function NextAction() {
   const profile    = useAuthStore(s => s.profile)
   const { trigger } = useMentorStore()
 
-  const [next,     setNext]     = useState(null)
-  const [top,      setTop]      = useState([])
   const [expanded, setExpanded] = useState(false)
   const [skipped,  setSkipped]  = useState([])
   const [rescheduling, setRescheduling] = useState(false)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const spokenRef = useRef(false)
 
-  // Build projects with their tasks attached
-  const projectsWithTasks = projects.map(p => ({
-    ...p,
-    tasks: tasks[p.id] || [],
-  }))
+  const projectsWithTasks = useMemo(
+    () =>
+      projects.map(p => ({
+        ...p,
+        tasks: tasks[p.id] || [],
+      })),
+    [projects, tasks],
+  )
+
+  const filtered = useMemo(
+    () =>
+      projectsWithTasks.map(p => ({
+        ...p,
+        tasks: (p.tasks || []).filter(t => !skipped.includes(t.id)),
+      })),
+    [projectsWithTasks, skipped],
+  )
+
+  const next = useMemo(() => getNextAction(filtered), [filtered])
+  const top = useMemo(() => getTopActions(filtered, 5), [filtered])
 
   useEffect(() => {
-    // Score and find next action
-    const filtered = projectsWithTasks.map(p => ({
-      ...p,
-      tasks: (p.tasks || []).filter(t => !skipped.includes(t.id)),
-    }))
-
-    const nextAction = getNextAction(filtered)
-    const topActions = getTopActions(filtered, 5)
-
-    setNext(nextAction)
-    setTop(topActions)
-
-    // Speak the next action once on load
-    if (nextAction && !spokenRef.current && profile) {
-      spokenRef.current = true
-      const urgency = getUrgency(nextAction.score)
-      if (urgency.label === 'Critical' || urgency.label === 'High') {
-        setTimeout(() => {
-          trigger(
-            urgency.label === 'Critical' ? 'idle' : 'next_task',
-            {
-              task:    nextAction.task.text,
-              project: nextAction.project.name,
-            },
-            profile,
-          )
-        }, 3000)
-      }
+    if (!next || !profile || spokenRef.current) return
+    spokenRef.current = true
+    const urgency = getUrgency(next.score)
+    if (urgency.label === 'Critical' || urgency.label === 'High') {
+      const t = setTimeout(() => {
+        trigger(
+          urgency.label === 'Critical' ? 'idle' : 'next_task',
+          {
+            task:    next.task.text,
+            project: next.project.name,
+          },
+          profile,
+        )
+      }, 3000)
+      return () => clearTimeout(t)
     }
-  }, [projects, tasks, skipped])
+  }, [next, profile, trigger])
 
   const handleStartNow = () => {
     if (!next) return
@@ -217,7 +217,7 @@ export default function NextAction() {
           <p className="text-[10px] tracking-[0.18em] uppercase text-[#444] font-medium px-1 mb-2">
             Queue
           </p>
-          {top.slice(1).map((item, i) => {
+          {top.slice(1).map((item) => {
             const u = getUrgency(item.score)
             const dl = item.task.due_date
               ? Math.ceil((new Date(item.task.due_date) - new Date()) / 86400000)

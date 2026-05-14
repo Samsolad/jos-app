@@ -8,7 +8,6 @@ import useRevenueStore from '../../store/revenueStore'
 import Badge from '../../components/ui/Badge'
 import RemindersPanel from '../../components/RemindersPanel'
 import useReminderStore from '../../store/reminderStore'
-import useMentorStore from '../../store/mentorStore'
 import useTaskStore from '../../store/taskStore'
 import useFocusStore from '../../store/focusStore'
 import DailyFocus from '../../components/DailyFocus'
@@ -43,11 +42,10 @@ export default function Dashboard() {
   const { projects, fetchProjects }  = useProjectStore()
   const { fetchTasks }               = useTaskStore()
   const { goals, fetchGoals } = useGoalStore()
-  const { habits, logs, fetchHabits, isLoggedToday } = useHabitStore()
+  const { habits, fetchHabits, isLoggedToday } = useHabitStore()
   const { entries, fetchEntries, getTotals } = useRevenueStore()
   const { fetchReminders } = useReminderStore()
-  const { trigger } = useMentorStore()
-  const { loadFocus, refresh } = useFocusStore()
+  const { loadFocus } = useFocusStore()
   
   
 
@@ -60,7 +58,7 @@ export default function Dashboard() {
       fetchReminders()
     }
     loadAll()
-  }, [profile])
+  }, [profile?.id])
 
   // Load tasks once projects are ready
   useEffect(() => {
@@ -86,7 +84,6 @@ export default function Dashboard() {
   const cur = profile?.currency || '£'
 
   // Projects summary
-  const allTasks = projects.map(p => []).flat() // placeholder — tasks loaded on project open
   const activeProjects = projects.filter(p => p.status === 'Active' || p.status === 'active')
 
   // Goals summary

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 
-const useProjectStore = create((set, get) => ({
+const useProjectStore = create((set) => ({
   projects: [],
   loading: false,
 
@@ -17,7 +17,7 @@ const useProjectStore = create((set, get) => ({
   addProject: async (name, status = 'Active', notes = '') => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('projects')
       .insert({ user_id: user.id, name, status, notes })
       .select()

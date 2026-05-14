@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import MentorBanner from '../../components/MentorBanner'
 import useMentorEngine from '../../hooks/useMentorEngine'
 import useAppFocus from '../../hooks/useAppFocus'
@@ -57,27 +57,29 @@ export default function Layout() {
   useMentorEngine()
   useAppFocus()
 
-// Unlock iOS audio on first tap
-useEffect(() => {
-  const unlock = () => {
-    if (window.speechSynthesis) {
-      const u = new SpeechSynthesisUtterance('')
-      u.volume = 0
-      window.speechSynthesis.speak(u)
+  // Unlock iOS audio on first tap
+  useEffect(() => {
+    const unlock = () => {
+      if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance('')
+        u.volume = 0
+        window.speechSynthesis.speak(u)
+      }
     }
-  }
-  document.addEventListener('touchstart', unlock, { once: true })
-  document.addEventListener('click', unlock, { once: true })
-  return () => {
-    document.removeEventListener('touchstart', unlock)
-    document.removeEventListener('click', unlock)
-  }
-}, [])
+    document.addEventListener('touchstart', unlock, { once: true })
+    document.addEventListener('click', unlock, { once: true })
+    return () => {
+      document.removeEventListener('touchstart', unlock)
+      document.removeEventListener('click', unlock)
+    }
+  }, [])
 
   // Close menus on route change
   useEffect(() => {
-    setMenuOpen(false)
-    setMoreOpen(false)
+    startTransition(() => {
+      setMenuOpen(false)
+      setMoreOpen(false)
+    })
   }, [location.pathname])
 
   // Close menus on outside click

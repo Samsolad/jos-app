@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import useGoalStore from '../../store/goalStore'
 import useAuthStore from '../../store/authStore'
-import { askClaude } from '../../lib/claude'
+import { askLLM } from '../../lib/llm'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import useMentorStore from '../../store/mentorStore'
@@ -24,9 +24,6 @@ function GoalCard({ goal, onToggleStep, onDelete, onAdjust }) {
   const done = steps.filter(s => s.done).length
   const pct = steps.length ? Math.round((done / steps.length) * 100) : 0
   const color = CAT_COLORS[goal.category] || '#888'
-  const { trigger } = useMentorStore()
-  const profile = useAuthStore(s => s.profile)
-  const { addReminder } = useReminderStore()
 
   return (
     <div className={`bg-[#111] border border-[#1f1f1f] rounded-md p-4 sm:p-5 mb-4 ${goal.done ? 'opacity-40' : ''}`}>
@@ -138,6 +135,8 @@ function ChatBubble({ role, text }) {
 export default function Goals() {
   const { goals, loading, fetchGoals, addGoal, updateGoal, deleteGoal, toggleGoalStep, updateGoalSteps } = useGoalStore()
   const profile = useAuthStore(s => s.profile)
+  const { addReminder } = useReminderStore()
+  const { trigger } = useMentorStore()
 
   // Planning session state
   const [session, setSession] = useState(null)
@@ -190,7 +189,7 @@ Category: ${goalCat}
 Context: ${goalCtx.trim() || 'none'}
 User role: ${profile?.role || 'professional'}, based in ${profile?.location || 'UK'}`
 
-    const proposal = await askClaude([{ role: 'user', content: prompt }], sys, true)
+    const proposal = await askLLM([{ role: 'user', content: prompt }], sys, true)
 
     if (!proposal || !proposal.steps) {
       setPlanStep('idle')
@@ -254,7 +253,7 @@ Rules:
 - When triggering [PLAN_AGREED], summarise the final agreed plan first
 - Stay direct and mentor-like throughout`
 
-    const reply = await askClaude(updatedHistory, sys)
+    const reply = await askLLM(updatedHistory, sys)
     setChatLoading(false)
 
     const agreed = reply.includes('[PLAN_AGREED]')

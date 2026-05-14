@@ -12,6 +12,7 @@
   --bg2: #181818;
   --line: #1f1f1f;
   --line2: #2a2a2a;
+  --line3: #3a3a3a;
   --white: #ffffff;
   --off: #e8e8e8;
   --dim: #888;
@@ -29,12 +30,12 @@ html, body, #root {
   font-family: 'Outfit', sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-  
-  /* iOS safe area support */
+}
+
+/* iOS safe area support */
 header {
   padding-top: env(safe-area-inset-top);
   height: calc(48px + env(safe-area-inset-top));
-}
 }
 
 ::-webkit-scrollbar { width: 2px; }

@@ -1,26 +1,16 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 
-const SESSION_KEY = 'jos_session_id'
-
-function getLocalSession() {
-  return localStorage.getItem(SESSION_KEY)
-}
-
-function setLocalSession(id) {
-  localStorage.setItem(SESSION_KEY, id)
-}
-
-function clearLocalSession() {
-  localStorage.removeItem(SESSION_KEY)
-}
-
 const useAuthStore = create((set, get) => ({
   user:    null,
   profile: null,
   loading: true,
+  _unsubscribeAuth: null,
 
   init: async () => {
+    // Unsubscribe any existing listener before re-initialising
+    get()._unsubscribeAuth?.()
+
     const { data: { session } } = await supabase.auth.getSession()
 
     if (session?.user) {
@@ -30,7 +20,7 @@ const useAuthStore = create((set, get) => ({
       set({ loading: false })
     }
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await get().fetchProfile(session.user.id)
         set({ user: session.user, profile })
@@ -38,6 +28,8 @@ const useAuthStore = create((set, get) => ({
         set({ user: null, profile: null })
       }
     })
+
+    set({ _unsubscribeAuth: () => subscription.unsubscribe() })
   },
 
   fetchProfile: async (userId) => {

@@ -3,7 +3,7 @@ import useInvestorStore from '../../store/investorStore'
 import useAuthStore from '../../store/authStore'
 import useProjectStore from '../../store/projectStore'
 import useRevenueStore from '../../store/revenueStore'
-import { askClaude } from '../../lib/claude'
+import { askLLM } from '../../lib/llm'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 
@@ -96,7 +96,7 @@ Write the email with:
 6. One clear ask (intro, advice, or resource)
 7. Professional sign-off`
 
-    const reply = await askClaude([{ role: 'user', content: prompt }], sys)
+    const reply = await askLLM([{ role: 'user', content: prompt }], sys)
     setGenerating(false)
 
     // Parse subject from reply

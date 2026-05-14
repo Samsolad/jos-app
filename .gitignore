@@ -28,3 +28,6 @@ dist
 .env.local
 .env
 *.local
+
+# Local Claude / Cursor worktrees
+.claude/

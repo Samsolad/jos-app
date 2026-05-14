@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { useEffect } from 'react' 
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -12,6 +11,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const login = useAuthStore(s => s.login)
   const navigate = useNavigate()
+
+  // Check for redirect reason (e.g. signed out from another device)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reason') === 'other_device') {
+      queueMicrotask(() =>
+        setError('You were signed out because your account was opened on another device.'),
+      )
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -25,12 +34,6 @@ export default function Login() {
       setError(err.message || 'Invalid email or password.')
     }
     setLoading(false)
-    useEffect(() => {
-      const params = new URLSearchParams(window.location.search)
-      if (params.get('reason') === 'other_device') {
-        setError('You were signed out because your account was opened on another device.')
-      }
-    }, [])
   }
 
   return (
