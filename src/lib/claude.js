@@ -1,58 +1,37 @@
-/** @deprecated Use `askLLM` from `./llm` (Google Gemini). Kept for reference only. */
-const CLAUDE_KEY = import.meta.env.VITE_ANTHROPIC_KEY
+import { supabase } from './supabase'
 
 export async function askClaude(messages, system = '', json = false) {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('claude-proxy', {
+      body: {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1200,
         system,
         messages,
-      }),
+      }
     })
 
-    const data = await res.json()
-
-    // Log errors visibly during development
-    if (data.error) {
-      console.error('Claude API error:', data.error)
-      return json ? null : `Error: ${data.error.message || 'Unknown error'}`
+    if (error) {
+      console.error('Edge function error:', error)
+      return json ? null : 'Could not connect right now.'
     }
 
-    const text = data.content?.map(b => b.text || '').join('') || ''
+    const text = data?.content?.map(b => b.text || '').join('') || ''
 
     if (!json) return text
 
-    // Try parsing JSON — handle markdown fences and extra text
     try {
-      // First try raw
-      return JSON.parse(text)
+      return JSON.parse(text.replace(/```json|```/g, '').trim())
     } catch {
-      // Try stripping markdown fences
-      const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
-      try {
-        return JSON.parse(stripped)
-      } catch {
-        // Try extracting JSON from surrounding text
-        const match = stripped.match(/\{[\s\S]*\}/)
-        if (match) {
-          try { return JSON.parse(match[0]) }
-          catch { /* fall through */ }
-        }
-        console.error('Could not parse Claude response as JSON:', text.slice(0, 500))
-        return null
+      const match = text.match(/\{[\s\S]*\}/)
+      if (match) {
+        try { return JSON.parse(match[0]) } catch { /* fall through */ }
       }
+      console.error('Could not parse JSON:', text.slice(0, 300))
+      return null
     }
   } catch (err) {
-    console.error('Claude fetch error:', err)
+    console.error('Claude error:', err)
     return json ? null : 'Could not connect right now.'
   }
 }
