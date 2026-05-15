@@ -13,10 +13,12 @@
   --line: #1f1f1f;
   --line2: #2a2a2a;
   --line3: #3a3a3a;
-  --white: #ffffff;
+  --white: #f4f2ed;
   --off: #e8e8e8;
-  --dim: #888;
-  --dimmer: #444;
+  --dim: rgba(244, 242, 237, 0.5);
+  --dimmer: rgba(244, 242, 237, 0.27);
+  --border: rgba(244, 242, 237, 0.09);
+  --shadow-cream: rgba(244, 242, 237, 0.27);
   --red: #ef4444;
   --green: #22c55e;
   --amber: #f59e0b;
