@@ -17,12 +17,29 @@ const useGoalStore = create((set, get) => ({
   addGoal: async (goalData) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
-    const { steps, ...rest } = goalData
-    const { data: goal, error } = await supabase
+    const { steps, burn_forecast, ...rest } = goalData
+    const goalRow = {
+      ...rest,
+      user_id: user.id,
+      meta: {
+        burn_forecast: burn_forecast ?? 0,
+        ...(rest.meta || {}),
+      },
+    }
+    let { data: goal, error } = await supabase
       .from('goals')
-      .insert({ ...rest, user_id: user.id })
+      .insert(goalRow)
       .select()
       .single()
+    if (error?.message?.includes('meta')) {
+      const res = await supabase
+        .from('goals')
+        .insert({ ...rest, user_id: user.id })
+        .select()
+        .single()
+      goal = res.data
+      error = res.error
+    }
     if (error || !goal) return null
 
     // Insert steps
@@ -34,6 +51,12 @@ const useGoalStore = create((set, get) => ({
         timeframe: s.timeframe || '',
         budget: s.budget || '',
         position: i,
+        meta: {
+          estimated_cost: s.estimated_cost ?? 0,
+          is_paid: Boolean(s.is_paid),
+          lean_alternative: s.lean_alternative || '',
+          depends_on_index: s.depends_on_index ?? null,
+        },
       }))
       const { data: insertedSteps } = await supabase
         .from('goal_steps')
@@ -107,6 +130,12 @@ const useGoalStore = create((set, get) => ({
         budget: s.budget || '',
         position: i,
         done: s.done || false,
+        meta: {
+          estimated_cost: s.estimated_cost ?? 0,
+          is_paid: Boolean(s.is_paid),
+          lean_alternative: s.lean_alternative || '',
+          depends_on_index: s.depends_on_index ?? null,
+        },
       }))
       const { data } = await supabase
         .from('goal_steps')

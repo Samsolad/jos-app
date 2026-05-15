@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import useGoalStore from '../../store/goalStore'
 import useAuthStore from '../../store/authStore'
 import { askLLM } from '../../lib/llm'
+import { DECOMPOSE_SYSTEM } from '../../lib/navigatorPrompts'
+import { sumBurnForecast, parseCostFromBudget } from '../../lib/taskMeta'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import useMentorStore from '../../store/mentorStore'
@@ -84,10 +86,17 @@ function GoalCard({ goal, onToggleStep, onDelete, onAdjust }) {
                   <p className={`text-[13px] font-light leading-relaxed ${step.done ? 'line-through text-[#444]' : 'text-[#e8e8e8]'}`}>
                     {step.text}
                   </p>
-                  {(step.timeframe || step.budget) && (
-                    <div className="flex gap-3 mt-1">
+                  {(step.timeframe || step.budget || step.meta?.lean_alternative) && (
+                    <div className="flex flex-wrap gap-3 mt-1">
                       {step.timeframe && <span className="text-[10px] text-[#444]">⏱ {step.timeframe}</span>}
-                      {step.budget && <span className="text-[10px] text-[#444]">💰 {step.budget}</span>}
+                      {step.budget && (
+                        <span className={`text-[10px] ${step.meta?.is_paid ? 'text-[#ef4444] font-medium' : 'text-[#444]'}`}>
+                          💰 {step.budget}
+                        </span>
+                      )}
+                      {step.meta?.lean_alternative && (
+                        <span className="text-[10px] text-[#4ade80]">Lean: {step.meta.lean_alternative}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -168,32 +177,29 @@ export default function Goals() {
     if (!goalText.trim()) return
     setPlanStep('analysing')
 
-    const sys = `You are J·OS, an honest and sharp life advisor and project manager.
-A user has shared a goal. Analyse it and propose a realistic plan.
-Return ONLY raw JSON — absolutely no markdown, no backticks, no text outside the JSON object:
-{
-  "understanding": "One sentence showing you truly understand what they want to achieve",
-  "reality_check": "One honest sentence about what makes this hard",
-  "steps": [
-    {"text": "Step description", "timeframe": "e.g. Week 1-2", "budget": "e.g. £0 or £200"}
-  ],
-  "timeline": "Total suggested timeline e.g. 3 months",
-  "total_budget": "Total estimated budget e.g. £500",
-  "budget_breakdown": "One sentence explaining the spend",
-  "reasoning": "One sentence of mentor advice — what will make or break this goal"
-}
-Give 4-8 specific, sequenced, actionable steps. Be realistic.`
-
     const prompt = `Goal: "${goalText.trim()}"
 Category: ${goalCat}
 Context: ${goalCtx.trim() || 'none'}
 User role: ${profile?.role || 'professional'}, based in ${profile?.location || 'UK'}`
 
-    const proposal = await askLLM([{ role: 'user', content: prompt }], sys, true)
+    const raw = await askLLM([{ role: 'user', content: prompt }], DECOMPOSE_SYSTEM, true)
 
-    if (!proposal || !proposal.steps) {
+    if (!raw || !raw.steps) {
       setPlanStep('idle')
       return
+    }
+
+    const proposal = {
+      ...raw,
+      steps: raw.steps.map((s, i) => ({
+        ...s,
+        estimated_cost: s.estimated_cost ?? parseCostFromBudget(s.budget),
+        is_paid: Boolean(s.is_paid),
+        lean_alternative: s.lean_alternative || '',
+        depends_on_index: s.depends_on_index ?? null,
+        position: i,
+      })),
+      burn_forecast: raw.burn_forecast ?? sumBurnForecast(raw.steps),
     }
 
     const firstMsg = `Here's my analysis of your goal: "${goalText.trim()}"
@@ -202,9 +208,10 @@ User role: ${profile?.role || 'professional'}, based in ${profile?.location || '
 
 **Reality check:** ${proposal.reality_check}
 
-**Proposed plan:** ${proposal.steps.length} steps over ${proposal.timeline}. Estimated budget: ${proposal.total_budget}.
+**Proposed plan:** ${proposal.steps.length} steps over ${proposal.timeline}. Burn forecast: £${proposal.burn_forecast}. Budget: ${proposal.total_budget}.
 
 ${proposal.budget_breakdown}
+Paid steps are flagged in red — lean alternatives included where possible.
 
 **Mentor insight:** ${proposal.reasoning}
 
@@ -278,10 +285,14 @@ Rules:
     if (!session) return
     const plan = session.agreedPlan || session.proposal
 
-    const steps = plan.steps.map(s => ({
-      text:      s.text,
+    const steps = plan.steps.map((s) => ({
+      text: s.text,
       timeframe: s.timeframe || '',
-      budget:    s.budget    || '',
+      budget: s.budget || '',
+      estimated_cost: s.estimated_cost ?? parseCostFromBudget(s.budget),
+      is_paid: Boolean(s.is_paid),
+      lean_alternative: s.lean_alternative || '',
+      depends_on_index: s.depends_on_index ?? null,
     }))
 
     const deadline = calcDeadline(plan.timeline)

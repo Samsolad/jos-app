@@ -1,3 +1,15 @@
+# J·OS Navigator — deploy checklist
+
+## 0. Database (required for tiers, costs, dependencies)
+
+In Supabase **SQL Editor**, run:
+
+`supabase/migrations/001_navigator.sql`
+
+This adds `meta` jsonb columns on `tasks`, `goal_steps`, `goals`, `projects`.
+
+---
+
 # Deploy `gemini-proxy` Edge Function
 
 ## 1. Install Supabase CLI

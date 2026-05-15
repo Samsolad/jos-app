@@ -9,6 +9,8 @@ import Input from '../../components/ui/Input'
 import Badge from '../../components/ui/Badge'
 import useMentorStore from '../../store/mentorStore'
 import useAuthStore from '../../store/authStore'
+import { getTopActions, partitionTasksByTier } from '../../lib/scoring'
+import { taskIsPaid, taskEstimatedCost, isDependencyBlocked } from '../../lib/taskMeta'
 
 export default function Projects() {
   const { projects, loading, fetchProjects, addProject, deleteProject } = useProjectStore()
@@ -22,6 +24,8 @@ export default function Projects() {
   const [newTask, setNewTask] = useState('')
   const [newTaskDate, setNewTaskDate] = useState('')
   const [updatingTask, setUpdatingTask] = useState(null)
+  const [showLater, setShowLater] = useState(false)
+  const [showGhosted, setShowGhosted] = useState(false)
 
   useEffect(() => { fetchProjects() }, [])
 
@@ -157,6 +161,54 @@ export default function Projects() {
 
   // ── DETAIL VIEW ────────────────────────────────────────────────
   const pct = projectTasks.length > 0 ? Math.round((doneCount / projectTasks.length) * 100) : 0
+  const { active, later, ghosted, paused, blocked } = partitionTasksByTier(
+    projectTasks,
+    projectTasks,
+  )
+  const projectsWithTasks = projects.map((p) => ({
+    ...p,
+    tasks: p.id === activeId ? projectTasks : tasks[p.id] || [],
+  }))
+  const topNow = getTopActions(projectsWithTasks, { [activeId]: projectTasks }, 3).filter(
+    (x) => x.project.id === activeId,
+  )
+
+  const renderTask = (t) => (
+    <div key={t.id}>
+      <TaskItem
+        task={t}
+        blockedByDep={isDependencyBlocked(t, projectTasks)}
+        onToggle={async () => {
+          await toggleTask(activeId, t.id)
+          const updated = tasks[activeId] || []
+          const justDone = updated.find((tk) => tk.id === t.id)
+          if (justDone && !t.done) {
+            const next = updated.find((tk) => !tk.done && !tk.blocked && tk.id !== t.id)
+            if (next) {
+              await trigger(
+                'next_task',
+                { task: next.text, project: activeProject?.name || '' },
+                profile,
+              )
+            } else {
+              await trigger('celebrate', { item: `all tasks in ${activeProject?.name}` }, profile)
+            }
+          }
+        }}
+        onUpdate={() => setUpdatingTask(updatingTask === t.id ? null : t.id)}
+        onDelete={() => deleteTask(activeId, t.id)}
+      />
+      {updatingTask === t.id && (
+        <TaskUpdatePanel
+          task={t}
+          allTasks={projectTasks}
+          projectName={activeProject.name}
+          onApply={handleApplyAIChanges}
+          onCancel={() => setUpdatingTask(null)}
+        />
+      )}
+    </div>
+  )
 
   return (
     <div className="animate-fadeUp">
@@ -207,54 +259,50 @@ export default function Projects() {
         </div>
       </div>
 
-      {/* Tasks */}
-      <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] font-medium mb-3">Tasks</p>
+      <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] font-medium mb-1">
+        Now — top {Math.min(3, topNow.length || active.length)} actions
+      </p>
+      <p className="text-[11px] text-[#444] font-light mb-3">
+        Paid burn (pending):{' '}
+        <span className="text-[#ef4444]">
+          £{projectTasks.filter((t) => !t.done && taskIsPaid(t)).reduce((s, t) => s + taskEstimatedCost(t), 0)}
+        </span>
+      </p>
 
       {projectTasks.length === 0 && (
-        <p className="text-[13px] text-[#444] font-light mb-4">No tasks yet. Add your first below.</p>
+        <p className="text-[13px] text-[#444] font-light mb-4">No tasks yet. Use Navigator on the hub or add below.</p>
       )}
 
-      {projectTasks.map((t) => (
-        <div key={t.id}>
-          <TaskItem
-            task={t}
-            onToggle={async () => {
-  await toggleTask(activeId, t.id)
-  const updated = tasks[activeId] || []
-  const justDone = updated.find(tk => tk.id === t.id)
-  if (justDone && !t.done) {
-    // Task was just marked done — find next
-    const next = updated.find(tk => !tk.done && !tk.blocked && tk.id !== t.id)
-    if (next) {
-      await trigger(
-        'next_task',
-        { task: next.text, project: activeProject?.name || '' },
-        profile,
-        [{ label: 'Continue', fn: () => {} }],
-      )
-    } else {
-      await trigger(
-        'celebrate',
-        { item: `all tasks in ${activeProject?.name || 'this project'}` },
-        profile,
-      )
-    }
-  }
-}}
-            onUpdate={() => setUpdatingTask(updatingTask === t.id ? null : t.id)}
-            onDelete={() => deleteTask(activeId, t.id)}
-          />
-          {updatingTask === t.id && (
-            <TaskUpdatePanel
-              task={t}
-              allTasks={projectTasks}
-              projectName={activeProject.name}
-              onApply={handleApplyAIChanges}
-              onCancel={() => setUpdatingTask(null)}
-            />
-          )}
-        </div>
-      ))}
+      {(topNow.length ? topNow.map((x) => x.task) : active.slice(0, 3)).map(renderTask)}
+
+      {blocked.length > 0 && (
+        <>
+          <p className="text-[10px] tracking-[0.16em] uppercase text-[#fbbf24] mt-4 mb-2">Waiting on dependency</p>
+          {blocked.map(renderTask)}
+        </>
+      )}
+
+      {later.length > 0 && (
+        <>
+          <button type="button" onClick={() => setShowLater(!showLater)} className="text-[10px] tracking-[0.16em] uppercase text-[#444] mt-4 mb-2 hover:text-[#888]">
+            Later ({later.length}) {showLater ? '▾' : '▸'}
+          </button>
+          {showLater && later.map(renderTask)}
+        </>
+      )}
+
+      {ghosted.length > 0 && (
+        <>
+          <button type="button" onClick={() => setShowGhosted(!showGhosted)} className="text-[10px] tracking-[0.16em] uppercase text-[#333] mt-2 mb-2 hover:text-[#666]">
+            Ghosted ({ghosted.length}) {showGhosted ? '▾' : '▸'}
+          </button>
+          {showGhosted && ghosted.map(renderTask)}
+        </>
+      )}
+
+      {paused.length > 0 && (
+        <p className="text-[11px] text-[#444] mt-3 italic">{paused.length} task(s) paused (crisis pivot)</p>
+      )}
 
       {/* Add task */}
       <div className="mt-4">

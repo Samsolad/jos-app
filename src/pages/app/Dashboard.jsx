@@ -11,6 +11,9 @@ import useReminderStore from '../../store/reminderStore'
 import useTaskStore from '../../store/taskStore'
 import useFocusStore from '../../store/focusStore'
 import DailyFocus from '../../components/DailyFocus'
+import NavigatorInput from '../../components/NavigatorInput'
+import NavigatorReview from '../../components/NavigatorReview'
+import NextAction from '../../components/NextAction'
 
 function StatBox({ label, value, color = 'white', sub }) {
   const colors = {
@@ -107,7 +110,7 @@ export default function Dashboard() {
   return (
     <div className="animate-fadeUp">
       {/* Greeting */}
-      <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] font-medium mb-2">Command Hub</p>
+      <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] font-medium mb-2">The Navigator</p>
       <h1 className="font-serif text-[24px] sm:text-[26px] font-bold mb-1">
         Good {greeting}, <em className="text-[#e8e8e8]">{firstName}</em>.
       </h1>
@@ -120,7 +123,10 @@ export default function Dashboard() {
 
 <div className="h-px bg-[#1f1f1f] mb-6" />
 
-      {/* AI-generated daily focus — automatic, no input needed */}
+      <NavigatorInput />
+      <NavigatorReview />
+      <NextAction />
+
       <DailyFocus />
 
       {/* Reminders & Meetings */}
