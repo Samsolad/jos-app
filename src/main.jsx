@@ -9,8 +9,15 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>
 )
 
-// Register service worker — with error handling
-if ('serviceWorker' in navigator) {
+// In dev, unregister any SW from older builds — it caches Vite responses and breaks the app.
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister())
+  })
+}
+
+// Service worker in dev caches Vite assets and breaks HMR / fresh loads — prod only.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(reg => console.log('SW registered:', reg.scope))

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jos-v1'
+const CACHE_NAME = 'jos-v2'
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json']
 
 self.addEventListener('install', event => {
