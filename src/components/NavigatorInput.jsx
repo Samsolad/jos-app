@@ -16,7 +16,9 @@ import Button from './ui/Button'
 export default function NavigatorInput() {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [statusLine, setStatusLine] = useState('')
   const profile = useAuthStore((s) => s.profile)
+  const user = useAuthStore((s) => s.user)
   const { projects, fetchProjects } = useProjectStore()
   const { addTask, fetchAllTasks, updateTaskMeta } = useTaskStore()
   const { startReview, setError, setStatus, error } = useNavigatorStore()
@@ -25,19 +27,28 @@ export default function NavigatorInput() {
   const handleSubmit = async () => {
     const input = text.trim()
     if (!input || loading) return
+
+    if (!user) {
+      setError('Sign in first — Navigator needs your session for AI.')
+      return
+    }
+
     setLoading(true)
     setError(null)
+    setStatusLine('Understanding input…')
 
     try {
       if (!projects.length) await fetchProjects()
       const list = useProjectStore.getState().projects
+
+      setStatusLine('Routing…')
       const intent = await classifyIntent(input, list)
 
       if (intent.intent === 'task') {
+        setStatusLine('Creating task…')
         const project = pickProjectForTask(list, intent.revenue_project_hint)
         if (!project) {
           setError('Create a project first (Work tab), then try again.')
-          setLoading(false)
           return
         }
         const due = parseDueFromIntent(intent.due_iso)
@@ -47,21 +58,20 @@ export default function NavigatorInput() {
         })
         await fetchAllTasks(list.map((p) => p.id))
         const tasksByProject = useTaskStore.getState().tasks
-        const tierUpdates = applyTierToLowScoring(list, tasksByProject, 3)
+        const tierUpdates = applyTierToLowScoring(list, tasksByProject, 3).slice(0, 12)
         for (const u of tierUpdates) {
           await updateTaskMeta(u.projectId, u.taskId, { tier: u.tier })
         }
         setText('')
         navigate('/projects')
-        setLoading(false)
         return
       }
 
       if (intent.intent === 'pivot') {
+        setStatusLine('Applying crisis pivot…')
         const focus = pickProjectForTask(list, intent.revenue_project_hint || intent.goal_text)
         if (!focus) {
           setError('No project found for pivot. Name a project in your message.')
-          setLoading(false)
           return
         }
         const crisis = intent.pivot_trigger || input
@@ -69,16 +79,17 @@ export default function NavigatorInput() {
         await fetchAllTasks(list.map((p) => p.id))
         setText('')
         navigate('/projects')
-        setLoading(false)
         return
       }
 
       setStatus('analysing')
+      setStatusLine('Building lean plan (AI)…')
       const proposal = await decomposeGoal(intent.goal_text || input, '', profile)
       if (!proposal) {
-        setError('Could not decompose goal. Check AI / edge function.')
+        setError(
+          'Could not build a plan. Deploy gemini-proxy in Supabase (see supabase/DEPLOY.md) or add VITE_GEMINI_API_KEY to .env.local.',
+        )
         setStatus('idle')
-        setLoading(false)
         return
       }
 
@@ -93,8 +104,11 @@ export default function NavigatorInput() {
     } catch (err) {
       console.error(err)
       setError(err?.message || 'Navigator failed')
+      setStatus('idle')
+    } finally {
+      setLoading(false)
+      setStatusLine('')
     }
-    setLoading(false)
   }
 
   return (
@@ -113,6 +127,9 @@ export default function NavigatorInput() {
           onChange={(e) => setText(e.target.value)}
           disabled={loading}
         />
+        {statusLine && loading && (
+          <p className="text-[#888] text-xs mt-2 font-light">{statusLine}</p>
+        )}
         {error && <p className="text-[#ef4444] text-xs mt-2">{error}</p>}
         <div className="flex gap-2 mt-3">
           <Button variant="solid" size="md" onClick={handleSubmit} disabled={loading || !text.trim()}>
@@ -127,4 +144,3 @@ export default function NavigatorInput() {
     </div>
   )
 }
-

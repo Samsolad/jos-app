@@ -1,25 +1,81 @@
 import { askLLM } from './llm'
-import { INTENT_SYSTEM, DECOMPOSE_SYSTEM } from './navigatorPrompts'
+import { DECOMPOSE_SYSTEM, INTENT_SYSTEM } from './navigatorPrompts'
 import { sumBurnForecast, parseCostFromBudget } from './taskMeta'
 
-export async function classifyIntent(text, projects = []) {
-  const projectList = projects.map((p) => p.name).join(', ') || 'none'
-  const result = await askLLM(
-    [{ role: 'user', content: `Projects: ${projectList}\n\nInput: "${text}"` }],
-    INTENT_SYSTEM,
-    true,
-  )
-  if (!result?.intent) {
-    const lower = text.toLowerCase()
-    if (/\b(by|before|today|tomorrow|\d{1,2}(:\d{2})?\s*(am|pm)?)\b/i.test(text)) {
-      return { intent: 'task', task_text: text, confidence: 0.6 }
+/** Fast local routing — no network; avoids spinner when edge function is down. */
+export function classifyIntentLocal(text) {
+  const lower = text.toLowerCase().trim()
+  if (!lower) return null
+
+  if (
+    /\b(pause|paused|crisis|emergency|urgent|double-?book|cancel everything|stop everything)\b/i.test(
+      lower,
+    )
+  ) {
+    return {
+      intent: 'pivot',
+      goal_text: text,
+      pivot_trigger: text,
+      confidence: 0.9,
     }
-    if (/\b(pause|urgent|crisis|double-book|emergency)\b/i.test(lower)) {
-      return { intent: 'pivot', goal_text: text, confidence: 0.6 }
-    }
-    return { intent: 'goal', goal_text: text, confidence: 0.5 }
   }
-  return result
+
+  const hasDeadline =
+    /\b(by|before|today|tomorrow|tonight|noon|midnight)\b/i.test(lower) ||
+    /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i.test(lower) ||
+    /\b\d{1,2}\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(lower)
+
+  const looksLikeTask =
+    hasDeadline ||
+    (/^(pay|send|call|email|book|fix|review|submit|complete|finish)\b/i.test(lower) &&
+      lower.length < 220)
+
+  if (looksLikeTask) {
+    return {
+      intent: 'task',
+      task_text: text,
+      due_iso: null,
+      confidence: 0.88,
+    }
+  }
+
+  if (
+    /\b(launch|in \d+\s*days?|within \d+\s*weeks?|goal|roadmap|sprint|venture|competitor)\b/i.test(
+      lower,
+    ) ||
+    lower.length > 120
+  ) {
+    return { intent: 'goal', goal_text: text, confidence: 0.75 }
+  }
+
+  return null
+}
+
+export async function classifyIntent(text, projects = []) {
+  const local = classifyIntentLocal(text)
+  if (local && local.confidence >= 0.85) {
+    return local
+  }
+
+  const projectList = projects.map((p) => p.name).join(', ') || 'none'
+  try {
+    const result = await askLLM(
+      [{ role: 'user', content: `Projects: ${projectList}\n\nInput: "${text}"` }],
+      INTENT_SYSTEM,
+      true,
+    )
+    if (result?.intent) return result
+  } catch (err) {
+    console.warn('[navigator] AI classify failed, using local rules:', err?.message)
+  }
+
+  return (
+    local || {
+      intent: 'goal',
+      goal_text: text,
+      confidence: 0.5,
+    }
+  )
 }
 
 export async function decomposeGoal(goalText, context = '', profile = {}) {
@@ -28,7 +84,14 @@ Context: ${context || 'none'}
 Role: ${profile?.role || 'founder'}, ${profile?.location || 'UK'}
 Currency: ${profile?.currency || '£'}`
 
-  const proposal = await askLLM([{ role: 'user', content: prompt }], DECOMPOSE_SYSTEM, true)
+  let proposal
+  try {
+    proposal = await askLLM([{ role: 'user', content: prompt }], DECOMPOSE_SYSTEM, true)
+  } catch (err) {
+    console.error('[navigator] decompose failed:', err)
+    throw err
+  }
+
   if (!proposal?.steps) return null
 
   const steps = proposal.steps.map((s, i) => ({
@@ -63,9 +126,7 @@ export function pickProjectForTask(projects, hint) {
     )
     if (match) return match
   }
-  const active = projects.find((p) =>
-    /active|critical/i.test(p.status || ''),
-  )
+  const active = projects.find((p) => /active|critical/i.test(p.status || ''))
   return active || projects[0]
 }
 
