@@ -1,6 +1,5 @@
 /**
- * App LLM entry point — Google Gemini (browser).
- * Set VITE_GEMINI_API_KEY in .env.local. Model is fixed in gemini.js (gemini-2.0-flash).
- * Note: VITE_* keys are visible in the client; restrict the key in Google AI Studio if needed.
+ * App LLM — Google Gemini via Supabase Edge Function `gemini-proxy`.
+ * Set secret GEMINI_API_KEY in Supabase (not VITE_*). User must be signed in.
  */
 export { askGemini as askLLM } from './gemini'

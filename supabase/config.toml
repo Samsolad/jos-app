@@ -1,0 +1,4 @@
+# See https://supabase.com/docs/guides/functions/function-configuration
+
+[functions.gemini-proxy]
+verify_jwt = true

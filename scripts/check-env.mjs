@@ -32,7 +32,11 @@ for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
       console.error('ERROR: Use the anon public key, not service_role.')
       process.exit(1)
     }
+  } else if (key === 'VITE_GEMINI_API_KEY') {
+    console.log(`${key}: set (${val.length} chars) — optional; prefer GEMINI_API_KEY Supabase secret + gemini-proxy`)
   } else if (key.includes('KEY') || key.includes('URL')) {
     console.log(`${key}: set (${val.length} chars)`)
   }
 }
+
+console.log('\nGemini: deploy supabase/functions/gemini-proxy and set secret GEMINI_API_KEY (see supabase/DEPLOY.md)')

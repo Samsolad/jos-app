@@ -1,35 +1,7 @@
-/**
- * Gemini calls run from the browser using VITE_GEMINI_API_KEY (exposed in the bundle).
- * This is separate from Supabase auth — login uses VITE_SUPABASE_ANON_KEY (anon public only).
- */
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY?.trim()
-/** Fixed model for J·OS — Gemini 2.0 Flash */
+import { supabase } from './supabase'
+
+/** Fixed model — must match supabase/functions/gemini-proxy */
 const GEMINI_MODEL = 'gemini-2.0-flash'
-
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
-
-/** Fold Claude-style history into Gemini alternating user/model turns. */
-function toGeminiContents(messages) {
-  const out = []
-  for (const m of messages) {
-    const role = m.role === 'assistant' ? 'model' : 'user'
-    const text =
-      typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-    const last = out[out.length - 1]
-    if (last && last.role === role) {
-      last.parts[0].text += `\n\n${text}`
-    } else {
-      out.push({ role, parts: [{ text }] })
-    }
-  }
-  return out
-}
-
-function extractText(data) {
-  const parts = data.candidates?.[0]?.content?.parts
-  if (!parts?.length) return ''
-  return parts.map((p) => p.text || '').join('')
-}
 
 function parseJsonFromText(text, json) {
   if (!json) return text
@@ -57,59 +29,44 @@ function parseJsonFromText(text, json) {
   }
 }
 
+function proxyErrorMessage(error, data) {
+  const fromBody = data?.error
+  if (typeof fromBody === 'string') return fromBody
+  if (error?.message) return error.message
+  return 'AI request failed. Deploy gemini-proxy and set GEMINI_API_KEY in Supabase secrets.'
+}
+
 /**
- * Google Gemini — same shape as the former Claude helper for drop-in use.
+ * Gemini via Supabase Edge Function — API key stays server-side (GEMINI_API_KEY secret).
  * @param {{ role: string, content: string }[]} messages
  * @param {string} system
- * @param {boolean} json - request JSON mode + parse object
+ * @param {boolean} json
  */
 export async function askGemini(messages, system = '', json = false) {
-  if (!GEMINI_KEY) {
-    console.error('Missing VITE_GEMINI_API_KEY')
-    return json ? null : 'Add your Gemini API key (VITE_GEMINI_API_KEY) in .env.local.'
-  }
-
   try {
-    const contents = toGeminiContents(messages)
-    const body = {
-      contents,
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.7,
-        ...(json ? { responseMimeType: 'application/json' } : {}),
-      },
-    }
-    if (system) {
-      body.systemInstruction = { parts: [{ text: system }] }
-    }
-
-    const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(GEMINI_KEY)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { messages, system, json, model: GEMINI_MODEL },
     })
 
-    const data = await res.json()
-
-    if (data.error) {
-      console.error('Gemini API error:', data.error)
-      return json ? null : `Error: ${data.error.message || 'Unknown error'}`
+    if (error) {
+      console.error('gemini-proxy invoke error:', error)
+      return json ? null : proxyErrorMessage(error, data)
     }
 
-    const reason = data.candidates?.[0]?.finishReason
-    if (reason && reason !== 'STOP' && reason !== 'MAX_TOKENS') {
-      console.warn('Gemini finishReason:', reason)
+    if (data?.error) {
+      console.error('gemini-proxy error:', data.error)
+      return json ? null : String(data.error)
     }
 
-    const text = extractText(data)
+    const text = data?.text ?? ''
     if (!text && json) {
-      console.error('Empty Gemini response:', JSON.stringify(data).slice(0, 400))
+      console.error('Empty gemini-proxy response:', data)
       return null
     }
 
     return parseJsonFromText(text, json)
   } catch (err) {
-    console.error('Gemini fetch error:', err)
+    console.error('gemini-proxy fetch error:', err)
     return json ? null : 'Could not connect right now.'
   }
 }
