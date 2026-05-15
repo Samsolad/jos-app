@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
+import { supabaseConfigError } from '../../lib/supabase'
+import { formatSupabaseAuthError } from '../../lib/supabaseKey'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 
@@ -12,6 +14,10 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const register = useAuthStore(s => s.register)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (supabaseConfigError) setError(supabaseConfigError)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -27,7 +33,7 @@ export default function Register() {
       if (err?.code === 'EMAIL_CONFIRMATION_REQUIRED') {
         setError(err.message)
       } else {
-        setError(err?.message || 'Registration failed.')
+        setError(formatSupabaseAuthError(err))
       }
     }
     setLoading(false)

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
+import { supabaseConfigError } from '../../lib/supabase'
+import { formatSupabaseAuthError } from '../../lib/supabaseKey'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 
@@ -14,6 +16,10 @@ export default function Login() {
 
   // Check for redirect reason (e.g. signed out from another device)
   useEffect(() => {
+    if (supabaseConfigError) {
+      setError(supabaseConfigError)
+      return
+    }
     const params = new URLSearchParams(window.location.search)
     if (params.get('reason') === 'other_device') {
       queueMicrotask(() =>
@@ -31,16 +37,7 @@ export default function Login() {
       await login(email, password)
       navigate('/')
     } catch (err) {
-      const msg = err?.message || ''
-      if (msg.includes('Invalid login credentials')) {
-        setError(
-          'Wrong email or password. If you just registered, open the confirmation email from Supabase first, then try again.',
-        )
-      } else if (msg.includes('Email not confirmed')) {
-        setError('Please confirm your email using the link we sent you, then sign in.')
-      } else {
-        setError(msg || 'Sign-in failed.')
-      }
+      setError(formatSupabaseAuthError(err))
     }
     setLoading(false)
   }

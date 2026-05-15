@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseConfigError } from './supabaseKey'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    '[jos-app] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Copy .env.example to .env.local and add your Supabase project values.',
-  )
+export const supabaseConfigError = getSupabaseConfigError(supabaseUrl, supabaseAnonKey)
+
+if (supabaseConfigError) {
+  console.error('[jos-app]', supabaseConfigError)
 }
 
 export const supabase = createClient(
@@ -15,5 +16,5 @@ export const supabase = createClient(
 )
 
 export function isSupabaseConfigured() {
-  return Boolean(supabaseUrl && supabaseAnonKey)
+  return !supabaseConfigError
 }

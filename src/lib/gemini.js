@@ -1,4 +1,8 @@
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY
+/**
+ * Gemini calls run from the browser using VITE_GEMINI_API_KEY (exposed in the bundle).
+ * This is separate from Supabase auth — login uses VITE_SUPABASE_ANON_KEY (anon public only).
+ */
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY?.trim()
 /** Fixed model for J·OS — Gemini 2.0 Flash */
 const GEMINI_MODEL = 'gemini-2.0-flash'
 

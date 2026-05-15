@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured, supabaseConfigError } from '../lib/supabase'
+import { formatSupabaseAuthError } from '../lib/supabaseKey'
 
 async function ensureProfileRow(user, nameHint) {
   const name =
@@ -78,7 +79,7 @@ const useAuthStore = create((set, get) => ({
 
   register: async (name, email, password) => {
     if (!isSupabaseConfigured()) {
-      throw new Error('App is missing Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.')
+      throw new Error(supabaseConfigError || 'App is missing Supabase configuration.')
     }
     const trimmedEmail = email.trim()
     const { data, error } = await supabase.auth.signUp({
@@ -86,7 +87,11 @@ const useAuthStore = create((set, get) => ({
       password,
       options: { data: { name: name.trim() } },
     })
-    if (error) throw error
+    if (error) {
+      const wrapped = new Error(formatSupabaseAuthError(error))
+      wrapped.cause = error
+      throw wrapped
+    }
     if (!data.user) throw new Error('Registration did not return a user. Check your Supabase Auth settings.')
 
     if (!data.session) {
@@ -105,14 +110,18 @@ const useAuthStore = create((set, get) => ({
 
   login: async (email, password) => {
     if (!isSupabaseConfigured()) {
-      throw new Error('App is missing Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.')
+      throw new Error(supabaseConfigError || 'App is missing Supabase configuration.')
     }
     const trimmedEmail = email.trim()
     const { data, error } = await supabase.auth.signInWithPassword({
       email: trimmedEmail,
       password,
     })
-    if (error) throw error
+    if (error) {
+      const wrapped = new Error(formatSupabaseAuthError(error))
+      wrapped.cause = error
+      throw wrapped
+    }
     if (!data.user) {
       throw new Error('Sign-in did not return a user. Check Supabase Auth and try again.')
     }
