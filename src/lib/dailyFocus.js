@@ -1,6 +1,6 @@
 import { askLLM } from './llm'
 
-export async function generateDailyFocus(profile, projects, goals, habits, entries) {
+export async function generateDailyFocus(profile, projects, goals, habits, entries, priorityHint = []) {
   if (!profile) return null
 
   const today = new Date().toDateString()
@@ -90,6 +90,13 @@ ${habitsDue.join(', ') || 'None'}
 REVENUE: £${revenueIn} in, £${revenueOut} out. Net: £${revenueIn - revenueOut}.
 
 USER ABOUT: ${profile.about || 'Not set'}
+
+PRIORITY ENGINE TOP TASKS (use these as strong hints for focus item 1–2):
+${priorityHint.length
+  ? priorityHint.map((item, i) =>
+      `${i + 1}. [score ${item.score}] "${item.task.text}" (${item.project.name})`
+    ).join('\n')
+  : 'None scored yet'}
 `
 
   const raw = await askLLM([{ role: 'user', content: prompt }], sys, true)

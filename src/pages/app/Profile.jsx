@@ -3,12 +3,17 @@ import useAuthStore from '../../store/authStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { getTier, tierLabel, LIMITS } from '../../lib/subscription'
+import { authorityDescription, AUTH_LABELS, getAuthorityLevel } from '../../lib/authority'
+import { getBehaviourSummary } from '../../lib/behaviour'
+import { ingestMemory } from '../../lib/memory'
 
 const CURRENCIES = ['£ GBP', '$ USD', '€ EUR', '₦ NGN', 'R ZAR', '¥ JPY']
 const NOTIF_STYLES = ['strict', 'balanced', 'gentle']
 
 export default function Profile() {
-  const { profile, updateProfile } = useAuthStore()
+  const { profile, updateProfile, user } = useAuthStore()
+  const auth = authorityDescription(profile)
+  const behaviour = getBehaviourSummary()
   const [editingInfo, setEditingInfo] = useState(false)
   const [editingAbout, setEditingAbout] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -31,6 +36,9 @@ export default function Profile() {
     const updates = {}
     fields.forEach(k => { updates[k] = form[k] })
     await updateProfile(updates)
+    if (fields.includes('about') && form.about?.trim() && user?.id) {
+      await ingestMemory(user.id, 'about', form.about.trim())
+    }
     setSaving(false)
     setEditingInfo(false)
     setEditingAbout(false)
@@ -218,12 +226,54 @@ export default function Profile() {
         <p className="font-serif text-[20px] font-bold mb-2">{tierLabel(getTier(profile))}</p>
         {getTier(profile) === 'free' && (
           <p className="text-[12px] text-[#888] font-light leading-relaxed mb-3">
-            Personal (£9/mo): unlimited projects & goals, full Daily Focus, 100 AI messages/day, all mentor triggers.
-            Operator (£29/mo): unlimited AI, investors, progressive authority (Phase 2).
+            Personal (£9/mo): unlimited projects & goals, full Daily Focus, 100 AI messages/day, preview authority.
+            Operator (£29/mo): unlimited AI, investors, full execute authority (auto pivot & tier enforcement).
           </p>
         )}
         <p className="text-[10px] text-[#444]">
           Stripe billing — Phase 5. Limits: {LIMITS[getTier(profile)]?.projects === Infinity ? '∞' : LIMITS[getTier(profile)]?.projects} projects, {LIMITS[getTier(profile)]?.chatMessagesPerDay === Infinity ? '∞' : LIMITS[getTier(profile)]?.chatMessagesPerDay} AI msgs/day.
+        </p>
+      </div>
+
+      {/* Progressive Authority */}
+      <div className="bg-[#111] border border-[#1f1f1f] rounded-md p-5 mb-4">
+        <p className="text-[10px] tracking-[0.16em] uppercase text-[#444] font-medium mb-3">
+          AI Authority
+        </p>
+        <p className="font-serif text-[18px] font-bold mb-2">{auth.label}</p>
+        <p className="text-[12px] text-[#888] font-light leading-relaxed mb-4">{auth.text}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {Object.keys(AUTH_LABELS).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => updateProfile({ authority_level: level })}
+              className={`px-3 py-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase rounded border transition-colors ${
+                getAuthorityLevel(profile) === level
+                  ? 'bg-white text-[#080808] border-white'
+                  : 'bg-transparent text-[#444] border-[#2a2a2a] hover:border-[#333] hover:text-[#888]'
+              }`}
+            >
+              {AUTH_LABELS[level]}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#444]">
+          Pivot: {auth.canPivot ? 'allowed' : 'blocked'} · Auto tier: {auth.canAutoTier ? 'on' : 'manual'}
+        </p>
+      </div>
+
+      {/* Behaviour signals */}
+      <div className="bg-[#111] border border-[#1f1f1f] rounded-md p-5 mb-4">
+        <p className="text-[10px] tracking-[0.16em] uppercase text-[#444] font-medium mb-3">
+          Behaviour Engine
+        </p>
+        <p className="text-[12px] text-[#888] font-light">
+          {behaviour.completionCount} tasks completed · {behaviour.skipCount} skips tracked
+          {behaviour.activeToday ? ' · active today' : ''}
+        </p>
+        <p className="text-[10px] text-[#444] mt-2">
+          Skips and completions adjust the momentum factor in your Priority Engine.
         </p>
       </div>
 

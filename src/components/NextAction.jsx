@@ -2,14 +2,18 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useProjectStore from '../store/projectStore'
 import useTaskStore from '../store/taskStore'
+import useGoalStore from '../store/goalStore'
 import useAuthStore from '../store/authStore'
 import useMentorStore from '../store/mentorStore'
 import { getNextAction, getTopActions, getUrgency } from '../lib/scoring'
+import { trackEvent, EVENT_TYPES } from '../lib/behaviour'
+import PriorityFactors from './PriorityFactors'
 
 export default function NextAction() {
   const navigate   = useNavigate()
   const { projects, fetchProjects } = useProjectStore()
   const { tasks }  = useTaskStore()
+  const { goals }  = useGoalStore()
   const profile    = useAuthStore(s => s.profile)
   const { trigger } = useMentorStore()
 
@@ -37,8 +41,21 @@ export default function NextAction() {
     [projectsWithTasks, skipped],
   )
 
-  const next = useMemo(() => getNextAction(filtered), [filtered])
-  const top = useMemo(() => getTopActions(filtered, 5), [filtered])
+  const scoreContext = useMemo(() => ({ goals }), [goals])
+
+  const tasksByProject = useMemo(
+    () => Object.fromEntries(filtered.map((p) => [p.id, p.tasks || []])),
+    [filtered],
+  )
+
+  const next = useMemo(
+    () => getNextAction(filtered, tasksByProject, scoreContext),
+    [filtered, tasksByProject, scoreContext],
+  )
+  const top = useMemo(
+    () => getTopActions(filtered, tasksByProject, 5, scoreContext),
+    [filtered, tasksByProject, scoreContext],
+  )
 
   useEffect(() => {
     if (!next || !profile || spokenRef.current) return
@@ -66,6 +83,11 @@ export default function NextAction() {
 
   const handleSkip = () => {
     if (!next) return
+    trackEvent(EVENT_TYPES.TASK_SKIPPED, {
+      taskId: next.task.id,
+      entityType: 'task',
+      projectId: next.project.id,
+    })
     setSkipped(s => [...s, next.task.id])
     spokenRef.current = false
   }
@@ -74,6 +96,11 @@ export default function NextAction() {
     if (!rescheduleDate || !next) return
     const { updateTask } = useTaskStore.getState()
     await updateTask(next.project.id, next.task.id, {
+      due_date: rescheduleDate,
+    })
+    trackEvent(EVENT_TYPES.TASK_RESCHEDULED, {
+      taskId: next.task.id,
+      entityType: 'task',
       due_date: rescheduleDate,
     })
     setRescheduling(false)
@@ -208,6 +235,8 @@ export default function NextAction() {
               </button>
             </div>
           )}
+
+          {expanded && next.factors && <PriorityFactors factors={next.factors} />}
         </div>
       </div>
 

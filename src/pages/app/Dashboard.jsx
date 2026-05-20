@@ -32,7 +32,7 @@ function StatBox({ label, value, color = 'white', sub, onClick }) {
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`bg-[#111] border border-[#1f1f1f] rounded-md p-3 sm:p-4 text-center w-full ${onClick ? 'hover:border-[#2a2a2a] transition-colors text-left' : ''}`}
+      className={`jos-card p-3 sm:p-4 text-center w-full ${onClick ? 'hover:border-jos-accent/30 transition-colors text-left' : ''}`}
     >
       <p className="text-[9px] sm:text-[10px] tracking-[0.14em] uppercase text-[#444] font-medium mb-2">{label}</p>
       <p className={`font-serif text-[22px] sm:text-[26px] font-bold leading-none ${colors[color]}`}>{value}</p>
@@ -43,7 +43,7 @@ function StatBox({ label, value, color = 'white', sub, onClick }) {
 
 function SectionTitle({ children }) {
   return (
-    <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] font-medium mb-3">{children}</p>
+    <p className="jos-label mb-3">{children}</p>
   )
 }
 

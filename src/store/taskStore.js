@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { markTaskActivityToday } from '../lib/activity'
+import { trackEvent, EVENT_TYPES } from '../lib/behaviour'
 import { getTaskMeta, TIERS } from '../lib/taskMeta'
 
 const useTaskStore = create((set, get) => ({
@@ -78,7 +79,14 @@ const useTaskStore = create((set, get) => ({
       .select()
       .single()
     if (data) {
-      if (newDone) markTaskActivityToday()
+      if (newDone) {
+        markTaskActivityToday()
+        trackEvent(EVENT_TYPES.TASK_COMPLETED, {
+          taskId,
+          entityType: 'task',
+          projectId,
+        })
+      }
       set((s) => ({
         tasks: {
           ...s.tasks,

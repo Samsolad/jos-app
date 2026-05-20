@@ -11,6 +11,8 @@ import {
   parseDueFromIntent,
 } from '../lib/navigator'
 import { applyTierToLowScoring } from '../lib/scoring'
+import { canAutoApply } from '../lib/authority'
+import { trackEvent, EVENT_TYPES } from '../lib/behaviour'
 import Button from './ui/Button'
 
 export default function NavigatorInput() {
@@ -36,6 +38,7 @@ export default function NavigatorInput() {
     setLoading(true)
     setError(null)
     setStatusLine('Understanding input…')
+    trackEvent(EVENT_TYPES.NAVIGATOR_RUN, { inputLength: input.length })
 
     try {
       if (!projects.length) await fetchProjects()
@@ -58,9 +61,11 @@ export default function NavigatorInput() {
         })
         await fetchAllTasks(list.map((p) => p.id))
         const tasksByProject = useTaskStore.getState().tasks
-        const tierUpdates = applyTierToLowScoring(list, tasksByProject, 3).slice(0, 12)
-        for (const u of tierUpdates) {
-          await updateTaskMeta(u.projectId, u.taskId, { tier: u.tier })
+        if (canAutoApply(profile, 'navigator_auto_tier')) {
+          const tierUpdates = applyTierToLowScoring(list, tasksByProject, 3).slice(0, 12)
+          for (const u of tierUpdates) {
+            await updateTaskMeta(u.projectId, u.taskId, { tier: u.tier })
+          }
         }
         setText('')
         navigate('/projects')
@@ -68,6 +73,12 @@ export default function NavigatorInput() {
       }
 
       if (intent.intent === 'pivot') {
+        if (!canAutoApply(profile, 'pivot')) {
+          setError(
+            'Crisis pivot requires Operator authority (execute level). Upgrade or set authority in Profile.',
+          )
+          return
+        }
         setStatusLine('Applying crisis pivot…')
         const focus = pickProjectForTask(list, intent.revenue_project_hint || intent.goal_text)
         if (!focus) {

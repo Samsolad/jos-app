@@ -13,7 +13,7 @@ import { getTopActions, partitionTasksByTier } from '../../lib/scoring'
 import { taskIsPaid, taskEstimatedCost, isDependencyBlocked } from '../../lib/taskMeta'
 
 export default function Projects() {
-  const { projects, loading, fetchProjects, addProject, deleteProject } = useProjectStore()
+  const { projects, loading, fetchProjects, addProject, deleteProject, updateProjectMeta } = useProjectStore()
   const { tasks, fetchTasks, addTask, toggleTask, deleteTask, updateTask } = useTaskStore()
 
   const [activeId, setActiveId] = useState(null)
@@ -256,6 +256,39 @@ export default function Projects() {
             className="h-full bg-white transition-all duration-500 ease-out"
             style={{ width: `${pct}%` }}
           />
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-[#1f1f1f]">
+          <p className="text-[10px] tracking-[0.16em] uppercase text-[#444] font-medium mb-2">
+            Priority engine
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-[12px] text-[#888]">
+              Weight (1–10)
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={activeProject.meta?.priority_weight ?? 5}
+                onChange={async (e) => {
+                  await updateProjectMeta(activeId, { priority_weight: Number(e.target.value) })
+                }}
+                className="w-24"
+              />
+              <span className="text-white w-4">{activeProject.meta?.priority_weight ?? 5}</span>
+            </label>
+            <label className="flex items-center gap-2 text-[12px] text-[#888] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(activeProject.meta?.is_revenue_critical)}
+                onChange={async (e) => {
+                  await updateProjectMeta(activeId, { is_revenue_critical: e.target.checked })
+                }}
+                className="rounded"
+              />
+              Revenue-critical venture
+            </label>
+          </div>
         </div>
       </div>
 

@@ -19,6 +19,12 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 2. Paste `supabase/migrations/002_jos_profile.sql`.
 3. **Run** — adds `onboarding_completed`, `preferences`, `active_session_id`, `subscription_tier`.
 
+### 0c. Phase 2 — authority, behaviour, pgvector memory
+
+1. Dashboard → **Database** → **Extensions** → enable **vector** (if not already).
+2. SQL Editor → paste `supabase/migrations/003_phase2.sql` → **Run**.
+3. Deploy edge function **`embed-memory`** (same steps as `gemini-proxy`, code from `supabase/functions/embed-memory/index.ts`). Uses the same `GEMINI_API_KEY` secret.
+
 ---
 
 ## 1. Gemini secret (server-side API key)
@@ -43,6 +49,12 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 **JWT:** The repo sets `verify_jwt = true` in `supabase/config.toml`. In the Dashboard, ensure the function requires a valid user JWT (default for new functions is often “verify JWT” on).
 
 5. After deploy, note the function URL (shown on the function page). The app uses `supabase.functions.invoke('gemini-proxy')` — no URL in `.env` needed if the project matches.
+
+### 2b. Deploy `embed-memory` (Phase 2 — vector search)
+
+1. Edge Functions → create **`embed-memory`**.
+2. Paste `supabase/functions/embed-memory/index.ts`.
+3. Deploy. Requires `GEMINI_API_KEY` (same secret as gemini-proxy).
 
 ---
 

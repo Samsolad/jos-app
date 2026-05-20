@@ -6,6 +6,7 @@ import useGoalStore from '../store/goalStore'
 import useHabitStore from '../store/habitStore'
 import useRevenueStore from '../store/revenueStore'
 import useTaskStore from '../store/taskStore'
+import { trackEvent, EVENT_TYPES } from '../lib/behaviour'
 
 const URGENCY = {
   critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)',   dot: 'bg-[#ef4444] animate-pulse', label: 'Critical' },
@@ -31,6 +32,7 @@ export default function DailyFocus() {
   const { tasks }    = useTaskStore()
 
   const handleRefresh = () => {
+    trackEvent(EVENT_TYPES.FOCUS_REFRESHED)
     refresh(profile, projects, goals, habits, entries, tasks)
   }
 

@@ -45,9 +45,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080808] flex">
+    <div className="min-h-screen bg-jos-bg flex">
       {/* Left panel */}
-      <div className="hidden md:flex flex-col w-[340px] border-r border-[#1f1f1f] p-12">
+      <div className="hidden md:flex flex-col w-[340px] border-r border-jos-border p-12 bg-jos-surface/30">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-white">J·OS</h1>
           <p className="text-[10px] tracking-[0.2em] uppercase text-[#444] mt-1">Personal Operating System</p>

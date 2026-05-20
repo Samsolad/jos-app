@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import useAuthStore from './authStore'
 import { getLimits, isAtLimit } from '../lib/subscription'
 
-const useProjectStore = create((set) => ({
+const useProjectStore = create((set, get) => ({
   projects: [],
   loading: false,
 
@@ -45,6 +45,16 @@ const useProjectStore = create((set) => ({
       projects: s.projects.map(p => p.id === id ? data : p)
     }))
     return data
+  },
+
+  updateProjectMeta: async (id, metaPatch) => {
+    const project = get().projects.find((p) => p.id === id)
+    if (!project) return null
+    const meta = {
+      ...(project.meta && typeof project.meta === 'object' ? project.meta : {}),
+      ...metaPatch,
+    }
+    return get().updateProject(id, { meta })
   },
 
   deleteProject: async (id) => {

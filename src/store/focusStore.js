@@ -1,38 +1,63 @@
 import { create } from 'zustand'
 import { generateDailyFocus } from '../lib/dailyFocus'
 import { getLimits } from '../lib/subscription'
+import { getTopActions } from '../lib/priorityEngine'
 
 const CACHE_KEY = 'jos_daily_focus'
 const CACHE_DATE_KEY = 'jos_daily_focus_date'
 
-const useFocusStore = create((set, get) => ({
-  focus:     null,
-  loading:   false,
-  error:     false,
-  lastDate:  null,
+function buildProjectsWithTasks(projects, tasksByProject) {
+  return projects.map((p) => ({
+    ...p,
+    tasks: tasksByProject?.[p.id] || p.tasks || [],
+  }))
+}
 
-  // Load focus — uses cache if already generated today
-  loadFocus: async (profile, projects, goals, habits, entries, forceRefresh = false) => {
+const useFocusStore = create((set, get) => ({
+  focus: null,
+  loading: false,
+  error: false,
+  lastDate: null,
+
+  loadFocus: async (
+    profile,
+    projects,
+    goals,
+    habits,
+    entries,
+    forceRefresh = false,
+    tasksByProject = {},
+  ) => {
     if (!profile) return
 
-    const today    = new Date().toDateString()
-    const cached   = localStorage.getItem(CACHE_KEY)
+    const limits = getLimits(profile)
+    if (!limits.dailyFocus) return
+
+    const today = new Date().toDateString()
+    const cached = localStorage.getItem(CACHE_KEY)
     const cacheDate = localStorage.getItem(CACHE_DATE_KEY)
 
-    // Use cache if same day and not forcing refresh
     if (!forceRefresh && cached && cacheDate === today) {
       try {
         const parsed = JSON.parse(cached)
         set({ focus: parsed, lastDate: today, loading: false })
         return
-      } catch { /* fall through to regenerate */ }
+      } catch { /* regenerate */ }
     }
 
     set({ loading: true, error: false })
 
     try {
+      const projectsWithTasks = buildProjectsWithTasks(projects, tasksByProject)
+      const priorityHint = getTopActions(projects, tasksByProject, 5, { goals })
+
       const result = await generateDailyFocus(
-        profile, projectsWithTasks, goals, habits, entries
+        profile,
+        projectsWithTasks,
+        goals,
+        habits,
+        entries,
+        priorityHint,
       )
 
       if (result && result.focus) {
