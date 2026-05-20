@@ -12,19 +12,44 @@ export default function ResetPassword() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
-  const updatePassword = useAuthStore((s) => s.updatePassword)
+  const completePasswordRecovery = useAuthStore((s) => s.completePasswordRecovery)
   const navigate = useNavigate()
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    let cancelled = false
+
+    async function initRecoverySession() {
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        if (exchangeError && !cancelled) {
+          setError(formatSupabaseAuthError(exchangeError))
+          return
+        }
+        if (!cancelled) {
+          setReady(true)
+          window.history.replaceState({}, '', window.location.pathname)
+        }
+        return
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!cancelled && session) setReady(true)
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        setReady(true)
+      }
     })
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true)
-    })
+    initRecoverySession()
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleSubmit = async (e) => {
@@ -40,13 +65,13 @@ export default function ResetPassword() {
     }
     setLoading(true)
     try {
-      await updatePassword(password)
-      await supabase.auth.signOut()
-      navigate('/login?reset=success')
+      await completePasswordRecovery(password)
+      navigate('/login?reset=success', { replace: true })
     } catch (err) {
       setError(formatSupabaseAuthError(err))
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   if (!ready) {
@@ -54,7 +79,7 @@ export default function ResetPassword() {
       <div className="min-h-screen bg-jos-bg flex items-center justify-center p-8">
         <div className="w-full max-w-md text-center">
           <p className="text-jos-muted text-sm mb-4">
-            Open the reset link from your email to set a new password.
+            {error || 'Open the reset link from your email to set a new password.'}
           </p>
           <Link to="/login" className="text-sm text-jos-accent hover:underline">
             Back to sign in

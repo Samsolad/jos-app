@@ -90,11 +90,16 @@ const useAuthStore = create((set, get) => ({
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        // Skip single-device lock during email password recovery
+        if (event === 'PASSWORD_RECOVERY') {
+          set({ user: session.user, profile: get().profile })
+          return
+        }
         let profile = await get().fetchProfile(session.user.id)
         if (!profile) profile = await ensureProfileRow(session.user)
         if (profile && sessionMismatch(profile)) {
           setLocalSessionId(null)
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           set({ user: null, profile: null })
           return
         }
@@ -247,6 +252,14 @@ const useAuthStore = create((set, get) => ({
       wrapped.cause = error
       throw wrapped
     }
+  },
+
+  completePasswordRecovery: async (password) => {
+    await get().updatePassword(password)
+    setLocalSessionId(null)
+    set({ user: null, profile: null })
+    // Local sign-out only — avoids hanging on global sign-out during recovery
+    await supabase.auth.signOut({ scope: 'local' })
   },
 }))
 
