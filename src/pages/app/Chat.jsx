@@ -5,6 +5,13 @@ import useGoalStore from '../../store/goalStore'
 import useHabitStore from '../../store/habitStore'
 import { askLLM } from '../../lib/llm'
 import Button from '../../components/ui/Button'
+import {
+  chatMessagesRemaining,
+  incrementChatUsage,
+} from '../../lib/subscription'
+
+const CHAT_HISTORY_KEY = 'jos_chat_history'
+const MAX_MESSAGES = 40
 
 function buildSystem(profile, projects, goals, habits) {
   const name = profile?.name || 'the user'
@@ -64,8 +71,22 @@ export default function Chat() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [limitError, setLimitError] = useState('')
   const endRef = useRef(null)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_HISTORY_KEY)
+      if (saved) setMessages(JSON.parse(saved).slice(-MAX_MESSAGES))
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)))
+    }
+  }, [messages])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -74,17 +95,26 @@ export default function Chat() {
   const send = async (text) => {
     const msg = text || input.trim()
     if (!msg || loading) return
+    setLimitError('')
+
+    const remaining = chatMessagesRemaining(profile)
+    if (remaining === 0) {
+      setLimitError('Daily AI message limit reached. Upgrade to Personal for 100/day.')
+      return
+    }
+
     setInput('')
+    incrementChatUsage()
 
     const userMsg = { role: 'user', content: msg }
-    const updated = [...messages, userMsg]
+    const updated = [...messages, userMsg].slice(-MAX_MESSAGES)
     setMessages(updated)
     setLoading(true)
 
     const sys = buildSystem(profile, projects, goals, habits)
     const reply = await askLLM(updated.slice(-12), sys)
 
-    setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+    setMessages(prev => [...prev, { role: 'assistant', content: reply }].slice(-MAX_MESSAGES))
     setLoading(false)
     setTimeout(() => inputRef.current?.focus(), 100)
   }
@@ -148,6 +178,8 @@ export default function Chat() {
         )}
         <div ref={endRef} />
       </div>
+
+      {limitError && <p className="text-[#ef4444] text-xs mb-2 flex-shrink-0">{limitError}</p>}
 
       {/* Input */}
       <div className="flex-shrink-0 border-t border-[#1f1f1f] pt-3 flex gap-2">

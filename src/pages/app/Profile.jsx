@@ -2,6 +2,7 @@ import { useState } from 'react'
 import useAuthStore from '../../store/authStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import { getTier, tierLabel, LIMITS } from '../../lib/subscription'
 
 const CURRENCIES = ['£ GBP', '$ USD', '€ EUR', '₦ NGN', 'R ZAR', '¥ JPY']
 const NOTIF_STYLES = ['strict', 'balanced', 'gentle']
@@ -209,6 +210,21 @@ export default function Profile() {
         <Button variant="solid" size="sm" onClick={() => handleSave(['currency','notif_style'])} disabled={saving}>
           {saving ? 'Saving…' : 'Save Preferences'}
         </Button>
+      </div>
+
+      {/* Plan */}
+      <div className="bg-[#111] border border-[#1f1f1f] rounded-md p-5 mb-4">
+        <p className="text-[10px] tracking-[0.16em] uppercase text-[#444] font-medium mb-3">Your Plan</p>
+        <p className="font-serif text-[20px] font-bold mb-2">{tierLabel(getTier(profile))}</p>
+        {getTier(profile) === 'free' && (
+          <p className="text-[12px] text-[#888] font-light leading-relaxed mb-3">
+            Personal (£9/mo): unlimited projects & goals, full Daily Focus, 100 AI messages/day, all mentor triggers.
+            Operator (£29/mo): unlimited AI, investors, progressive authority (Phase 2).
+          </p>
+        )}
+        <p className="text-[10px] text-[#444]">
+          Stripe billing — Phase 5. Limits: {LIMITS[getTier(profile)]?.projects === Infinity ? '∞' : LIMITS[getTier(profile)]?.projects} projects, {LIMITS[getTier(profile)]?.chatMessagesPerDay === Infinity ? '∞' : LIMITS[getTier(profile)]?.chatMessagesPerDay} AI msgs/day.
+        </p>
       </div>
 
       {/* Account info */}

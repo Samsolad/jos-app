@@ -6,14 +6,20 @@ import useHabitStore    from '../store/habitStore'
 import useRevenueStore  from '../store/revenueStore'
 import useReminderStore from '../store/reminderStore'
 import { supabase }     from '../lib/supabase'
+import useAuthStore     from '../store/authStore'
+import useTaskStore     from '../store/taskStore'
 
 export default function useAppFocus() {
   const navigate = useNavigate()
+  const checkSessionLock = useAuthStore(s => s.checkSessionLock)
   const { fetchProjects }  = useProjectStore()
   const { fetchGoals }     = useGoalStore()
   const { fetchHabits }    = useHabitStore()
   const { fetchEntries }   = useRevenueStore()
   const { fetchReminders } = useReminderStore()
+  const { fetchTasks }     = useTaskStore()
+  const { projects }       = useProjectStore()
+
   useEffect(() => {
     let hiddenAt = null
 
@@ -36,12 +42,16 @@ export default function useAppFocus() {
           const { data: { session } } = await supabase.auth.getSession()
 
           if (!session) {
-            // Session gone — redirect to login
             navigate('/login')
             return
           }
 
-          // Refresh all stores silently
+          const ok = await checkSessionLock()
+          if (!ok) {
+            navigate('/login?reason=other_device')
+            return
+          }
+
           await Promise.all([
             fetchProjects(),
             fetchGoals(),
@@ -49,6 +59,8 @@ export default function useAppFocus() {
             fetchEntries(),
             fetchReminders(),
           ])
+          const projs = useProjectStore.getState().projects
+          await Promise.all(projs.map(p => fetchTasks(p.id)))
         } catch (err) {
           console.warn('App focus refresh error:', err)
         }

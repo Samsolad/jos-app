@@ -13,6 +13,12 @@ You can do everything from the **Supabase Dashboard** in the browser (works on W
 
 You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements.
 
+### 0b. Profile columns (onboarding, session lock, tiers)
+
+1. SQL Editor → **New query**.
+2. Paste `supabase/migrations/002_jos_profile.sql`.
+3. **Run** — adds `onboarding_completed`, `preferences`, `active_session_id`, `subscription_tier`.
+
 ---
 
 ## 1. Gemini secret (server-side API key)

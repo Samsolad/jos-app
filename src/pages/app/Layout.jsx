@@ -6,7 +6,7 @@ import useMentorEngine from '../../hooks/useMentorEngine'
 import useAppFocus from '../../hooks/useAppFocus'
 
 const NAV = [
-  { to: '/',        icon: '⊞', label: 'Nav'    },
+  { to: '/',        icon: '⊞', label: 'Hub'    },
   { to: '/projects',icon: '⊡', label: 'Work'   },
   { to: '/goals',   icon: '◈', label: 'Goals'  },
   { to: '/habits',  icon: '⊕', label: 'Habits' },
@@ -18,7 +18,7 @@ const NAV = [
 ]
 
 const MOBILE_NAV = [
-  { to: '/',        icon: '⊞', label: 'Nav'   },
+  { to: '/',        icon: '⊞', label: 'Hub'   },
   { to: '/projects',icon: '⊡', label: 'Work'  },
   { to: '/goals',   icon: '◈', label: 'Goals' },
   { to: '/chat',    icon: '⊛', label: 'AI'    },
@@ -35,7 +35,7 @@ const MORE_ITEMS = [
 ]
 
 const SECTION_NAMES = {
-  '/':         'Navigator',
+  '/':         'Command Hub',
   '/projects': 'Projects',
   '/goals':    'Goals',
   '/habits':   'Habits',

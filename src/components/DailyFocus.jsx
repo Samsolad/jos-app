@@ -5,6 +5,7 @@ import useProjectStore from '../store/projectStore'
 import useGoalStore from '../store/goalStore'
 import useHabitStore from '../store/habitStore'
 import useRevenueStore from '../store/revenueStore'
+import useTaskStore from '../store/taskStore'
 
 const URGENCY = {
   critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)',   dot: 'bg-[#ef4444] animate-pulse', label: 'Critical' },
@@ -27,9 +28,10 @@ export default function DailyFocus() {
   const { goals }    = useGoalStore()
   const { habits }   = useHabitStore()
   const { entries }  = useRevenueStore()
+  const { tasks }    = useTaskStore()
 
   const handleRefresh = () => {
-    refresh(profile, projects, goals, habits, entries)
+    refresh(profile, projects, goals, habits, entries, tasks)
   }
 
   // ── LOADING ──────────────────────────────────────────────────

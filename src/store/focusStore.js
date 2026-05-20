@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { generateDailyFocus } from '../lib/dailyFocus'
+import { getLimits } from '../lib/subscription'
 
 const CACHE_KEY = 'jos_daily_focus'
 const CACHE_DATE_KEY = 'jos_daily_focus_date'
@@ -31,7 +32,7 @@ const useFocusStore = create((set, get) => ({
 
     try {
       const result = await generateDailyFocus(
-        profile, projects, goals, habits, entries
+        profile, projectsWithTasks, goals, habits, entries
       )
 
       if (result && result.focus) {
@@ -46,8 +47,8 @@ const useFocusStore = create((set, get) => ({
     }
   },
 
-  refresh: async (profile, projects, goals, habits, entries) => {
-    await get().loadFocus(profile, projects, goals, habits, entries, true)
+  refresh: async (profile, projects, goals, habits, entries, tasksByProject) => {
+    await get().loadFocus(profile, projects, goals, habits, entries, true, tasksByProject)
   },
 
   clear: () => {

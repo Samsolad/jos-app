@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './store/authStore'
+import { isOnboardingComplete } from './lib/dashboardPrefs'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import Marketing from './pages/Marketing'
+import OnboardingWizard from './pages/onboarding/OnboardingWizard'
 import Layout from './pages/app/Layout'
 import Dashboard from './pages/app/Dashboard'
 import Projects from './pages/app/Projects'
@@ -24,28 +27,48 @@ function Spinner() {
 }
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuthStore()
+  const { user, profile, loading } = useAuthStore()
+  if (loading) return <Spinner />
+  if (!user) return <Navigate to="/welcome" replace />
+  if (!isOnboardingComplete(profile)) return <Navigate to="/onboarding" replace />
+  return children
+}
+
+function OnboardingRoute({ children }) {
+  const { user, profile, loading } = useAuthStore()
   if (loading) return <Spinner />
   if (!user) return <Navigate to="/login" replace />
+  if (isOnboardingComplete(profile)) return <Navigate to="/" replace />
   return children
 }
 
 function AuthRoute({ children }) {
-  const { user, loading } = useAuthStore()
+  const { user, profile, loading } = useAuthStore()
   if (loading) return <Spinner />
-  if (user) return <Navigate to="/" replace />
+  if (user) {
+    return <Navigate to={isOnboardingComplete(profile) ? '/' : '/onboarding'} replace />
+  }
   return children
 }
 
 export default function App() {
   const init = useAuthStore(s => s.init)
+  const checkSessionLock = useAuthStore(s => s.checkSessionLock)
+
   useEffect(() => { init() }, [init])
+
+  useEffect(() => {
+    const id = setInterval(() => { checkSessionLock() }, 60_000)
+    return () => clearInterval(id)
+  }, [checkSessionLock])
 
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/welcome" element={<Marketing />} />
         <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
         <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
+        <Route path="/onboarding" element={<OnboardingRoute><OnboardingWizard /></OnboardingRoute>} />
 
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
@@ -60,7 +83,7 @@ export default function App() {
           <Route path="investors" element={<Investors />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/welcome" replace />} />
       </Routes>
     </BrowserRouter>
   )

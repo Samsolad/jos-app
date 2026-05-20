@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
+import { isOnboardingComplete } from '../../lib/dashboardPrefs'
 import { supabaseConfigError } from '../../lib/supabase'
 import { formatSupabaseAuthError } from '../../lib/supabaseKey'
 import Button from '../../components/ui/Button'
@@ -35,7 +36,8 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/')
+      const profile = useAuthStore.getState().profile
+      navigate(isOnboardingComplete(profile) ? '/' : '/onboarding')
     } catch (err) {
       setError(formatSupabaseAuthError(err))
     }

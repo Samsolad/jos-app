@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import useAuthStore from './authStore'
+import { getLimits, isAtLimit } from '../lib/subscription'
 
 const useProjectStore = create((set) => ({
   projects: [],
@@ -17,6 +19,12 @@ const useProjectStore = create((set) => ({
   addProject: async (name, status = 'Active', notes = '') => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
+    const profile = useAuthStore.getState().profile
+    const limits = getLimits(profile)
+    const count = get().projects.length
+    if (isAtLimit(count, limits.projects)) {
+      throw new Error(`Free plan allows up to ${limits.projects} projects. Upgrade to Personal for unlimited.`)
+    }
     const { data } = await supabase
       .from('projects')
       .insert({ user_id: user.id, name, status, notes })

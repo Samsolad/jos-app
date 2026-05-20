@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { markTaskActivityToday } from '../lib/activity'
 import { getTaskMeta, TIERS } from '../lib/taskMeta'
 
 const useTaskStore = create((set, get) => ({
@@ -77,6 +78,7 @@ const useTaskStore = create((set, get) => ({
       .select()
       .single()
     if (data) {
+      if (newDone) markTaskActivityToday()
       set((s) => ({
         tasks: {
           ...s.tasks,

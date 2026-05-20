@@ -5,13 +5,21 @@ import useProjectStore from '../store/projectStore'
 import useGoalStore from '../store/goalStore'
 import useHabitStore from '../store/habitStore'
 import useMentorStore from '../store/mentorStore'
+import useRevenueStore from '../store/revenueStore'
 import { getNextAction } from '../lib/scoring'
 import useTaskStore from '../store/taskStore'
+import { hadTaskActivityToday } from '../lib/activity'
+import { canUseMentorTrigger, getLimits } from '../lib/subscription'
 
 const IDLE_MINUTES       = 20
-const IDLE_COOLDOWN_MS   = 30 * 60 * 1000  // 30 minutes between idle nudges
-const EOD_HOURS          = [17, 19, 21]     // 5pm, 7pm, 9pm
-const NO_ACTIVITY_HOURS  = [14, 16]         // 2pm, 4pm
+const IDLE_COOLDOWN_MS   = 30 * 60 * 1000
+const EOD_HOURS          = [17, 19, 21]
+const NO_ACTIVITY_HOURS  = [14, 16]
+const MORNING_HOURS      = [6, 7, 8, 9, 10, 11]
+
+function allTasksFlat(tasks) {
+  return Object.values(tasks || {}).flat()
+}
 
 export default function useMentorEngine() {
   const navigate   = useNavigate()
@@ -19,6 +27,7 @@ export default function useMentorEngine() {
   const { projects } = useProjectStore()
   const { goals }    = useGoalStore()
   const { habits, isLoggedToday } = useHabitStore()
+  const { entries, getTotals } = useRevenueStore()
   const { trigger }  = useMentorStore()
   const { tasks } = useTaskStore()
 
@@ -30,7 +39,6 @@ export default function useMentorEngine() {
     lastActivity.current = Date.now()
   }, [])
 
-  // Track user activity
   useEffect(() => {
     const reset = () => { lastActivity.current = Date.now() }
     const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll']
@@ -46,70 +54,106 @@ export default function useMentorEngine() {
       const hour    = now.getHours()
       const dateKey = now.toDateString()
       const fired   = firedToday.current
+      const limits  = getLimits(profile)
+
+      const flatTasks = allTasksFlat(tasks)
+      const projectsWithTasks = projects.map(p => ({
+        ...p,
+        tasks: tasks[p.id] || [],
+      }))
+      const doneToday = hadTaskActivityToday()
+      const doneCount = flatTasks.filter(t => t.done).length
+      const pendingCount = flatTasks.filter(t => !t.done).length
+
+      // ── MORNING BRIEFING (6–11am, once) ───────────────────────
+      if (MORNING_HOURS.includes(hour) && limits.morningBriefingVoice !== false) {
+        const key = `morning_${dateKey}`
+        if (!fired.has(key) && canUseMentorTrigger(profile, 'morning_briefing')) {
+          fired.add(key)
+          const activeGoals = goals.filter(g => !g.done).map(g => g.text).slice(0, 3).join('; ')
+          await trigger(
+            'morning_briefing',
+            {
+              projects: projects.map(p => p.name).join(', ') || 'none',
+              goals: activeGoals || 'none',
+              tasks: pendingCount,
+            },
+            profile,
+            [{ label: 'Command Hub', fn: () => navigate('/') }],
+          )
+        }
+      }
+
+      // ── WEEKLY REVIEW (Monday) ────────────────────────────────
+      if (now.getDay() === 1 && hour === 9 && limits.weeklyReview) {
+        const key = `weekly_${dateKey}`
+        if (!fired.has(key)) {
+          fired.add(key)
+          const { net } = getTotals(entries)
+          await trigger(
+            'weekly_review',
+            {
+              done: doneCount,
+              pending: pendingCount,
+              goals: goals.filter(g => !g.done).length,
+              habits: habits.length,
+              revenue: net,
+            },
+            profile,
+            [{ label: 'Command Hub', fn: () => navigate('/') }],
+          )
+        }
+      }
 
       // ── IDLE NUDGE ───────────────────────────────────────────
-      const idleMs   = Date.now() - (lastActivity.current ?? Date.now())
-      const idleMins = Math.floor(idleMs / 60000)
-      const sinceLastNudge = Date.now() - lastIdleNudge.current
+      if (canUseMentorTrigger(profile, 'idle')) {
+        const idleMs   = Date.now() - (lastActivity.current ?? Date.now())
+        const idleMins = Math.floor(idleMs / 60000)
+        const sinceLastNudge = Date.now() - lastIdleNudge.current
 
-      if (idleMins >= IDLE_MINUTES && sinceLastNudge > IDLE_COOLDOWN_MS) {
-        lastIdleNudge.current = Date.now()
-
-        // Use scoring engine to find actual next action
-        const projectsWithTasks = projects.map(p => ({
-          ...p,
-          tasks: tasks[p.id] || [],
-        }))
-        const nextAction = getNextAction(projectsWithTasks)
-
-        await trigger(
-          'idle',
-          {
-            minutes: idleMins,
-            task:    nextAction?.task?.text || null,
-            project: nextAction?.project?.name || null,
-          },
-          profile,
-          nextAction
-            ? [{ label: 'Open Work', fn: () => navigate('/projects') }]
-            : [],
-        )
+        if (idleMins >= IDLE_MINUTES && sinceLastNudge > IDLE_COOLDOWN_MS) {
+          lastIdleNudge.current = Date.now()
+          const nextAction = getNextAction(projectsWithTasks)
+          await trigger(
+            'idle',
+            {
+              minutes: idleMins,
+              task:    nextAction?.task?.text || null,
+              project: nextAction?.project?.name || null,
+            },
+            profile,
+            nextAction
+              ? [{ label: 'Open Work', fn: () => navigate('/projects') }]
+              : [],
+          )
+        }
       }
 
       // ── NO ACTIVITY ALL DAY ──────────────────────────────────
-      if (NO_ACTIVITY_HOURS.includes(hour)) {
+      if (NO_ACTIVITY_HOURS.includes(hour) && canUseMentorTrigger(profile, 'no_activity')) {
         const key = `no_activity_${dateKey}_${hour}`
-        if (!fired.has(key)) {
-          // Check if any tasks completed today (rough heuristic — tasks store)
-          const hasActivity = projects.some(p =>
-            (p.tasks || []).some(t => t.done)
+        if (!fired.has(key) && !doneToday && projects.length > 0) {
+          fired.add(key)
+          await trigger(
+            'no_activity',
+            {
+              projects: projects.map(p => p.name).join(', '),
+              hour,
+            },
+            profile,
+            [{ label: 'Open Work', fn: () => navigate('/projects') }],
           )
-          if (!hasActivity && projects.length > 0) {
-            fired.add(key)
-            await trigger(
-              'no_activity',
-              {
-                projects: projects.map(p => p.name).join(', '),
-                hour,
-              },
-              profile,
-              [{ label: 'Open Work', fn: () => navigate('/projects') }],
-            )
-          }
         }
       }
 
       // ── END OF DAY ───────────────────────────────────────────
-      if (EOD_HOURS.includes(hour)) {
+      if (EOD_HOURS.includes(hour) && canUseMentorTrigger(profile, 'eod')) {
         const key = `eod_${dateKey}_${hour}`
         if (!fired.has(key)) {
           fired.add(key)
-          const allTasks  = projects.flatMap(p => p.tasks || [])
-          const done      = allTasks.filter(t => t.done).length
-          const pending   = allTasks.filter(t => !t.done).length
           await trigger(
             'eod',
-            { done, pending },
+            { done: doneToday ? 1 : 0, pending: pendingCount },
             profile,
           )
         }
@@ -133,12 +177,12 @@ export default function useMentorEngine() {
             profile,
             [{ label: 'View Goal', fn: () => navigate('/goals') }],
           )
-          break // one at a time
+          break
         }
       }
 
-      // ── HABITS REMINDER — 8pm if not all done ────────────────
-      if (hour === 20) {
+      // ── HABITS REMINDER — 8pm ────────────────────────────────
+      if (hour === 20 && canUseMentorTrigger(profile, 'wise')) {
         const key = `habits_${dateKey}`
         if (!fired.has(key) && habits.length > 0) {
           const notDone = habits.filter(h => !isLoggedToday(h.id))
@@ -147,7 +191,7 @@ export default function useMentorEngine() {
             await trigger(
               'wise',
               {
-                task: `${notDone.length} habit${notDone.length > 1 ? 's' : ''} not logged today: ${notDone.map(h => h.name).join(', ')}`
+                task: `${notDone.length} habit${notDone.length > 1 ? 's' : ''} not logged: ${notDone.map(h => h.name).join(', ')}`,
               },
               profile,
               [{ label: 'Log Habits', fn: () => navigate('/habits') }],
@@ -156,8 +200,8 @@ export default function useMentorEngine() {
         }
       }
 
-    }, 60000) // check every minute
+    }, 60000)
 
     return () => clearInterval(interval)
-  }, [profile, projects, goals, habits])
+  }, [profile, projects, goals, habits, tasks, entries])
 }

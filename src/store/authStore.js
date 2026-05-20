@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured, supabaseConfigError } from '../lib/supabase'
 import { formatSupabaseAuthError } from '../lib/supabaseKey'
+import {
+  createSessionId,
+  getLocalSessionId,
+  setLocalSessionId,
+  sessionMismatch,
+} from '../lib/session'
 
 async function ensureProfileRow(user, nameHint) {
   const name =
@@ -28,8 +34,35 @@ const useAuthStore = create((set, get) => ({
   loading: true,
   _unsubscribeAuth: null,
 
+  claimSession: async (userId) => {
+    const sessionId = createSessionId()
+    setLocalSessionId(sessionId)
+    const { data } = await supabase
+      .from('profiles')
+      .update({ active_session_id: sessionId })
+      .eq('id', userId)
+      .select()
+      .single()
+    if (data) set({ profile: data })
+    return sessionId
+  },
+
+  checkSessionLock: async () => {
+    const user = get().user
+    if (!user) return true
+    const profile = await get().fetchProfile(user.id)
+    if (!profile) return true
+    if (sessionMismatch(profile)) {
+      setLocalSessionId(null)
+      await supabase.auth.signOut()
+      set({ user: null, profile: null })
+      return false
+    }
+    set({ profile })
+    return true
+  },
+
   init: async () => {
-    // Unsubscribe any existing listener before re-initialising
     get()._unsubscribeAuth?.()
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -37,7 +70,20 @@ const useAuthStore = create((set, get) => ({
     if (session?.user) {
       let profile = await get().fetchProfile(session.user.id)
       if (!profile) profile = await ensureProfileRow(session.user)
-      set({ user: session.user, profile, loading: false })
+
+      if (profile && sessionMismatch(profile)) {
+        setLocalSessionId(null)
+        await supabase.auth.signOut()
+        set({ user: null, profile: null, loading: false })
+      } else if (!getLocalSessionId() && profile?.active_session_id) {
+        setLocalSessionId(profile.active_session_id)
+        set({ user: session.user, profile, loading: false })
+      } else if (!profile?.active_session_id) {
+        await get().claimSession(session.user.id)
+        set({ user: session.user, profile: get().profile || profile, loading: false })
+      } else {
+        set({ user: session.user, profile, loading: false })
+      }
     } else {
       set({ loading: false })
     }
@@ -46,9 +92,16 @@ const useAuthStore = create((set, get) => ({
       if (session?.user) {
         let profile = await get().fetchProfile(session.user.id)
         if (!profile) profile = await ensureProfileRow(session.user)
+        if (profile && sessionMismatch(profile)) {
+          setLocalSessionId(null)
+          await supabase.auth.signOut()
+          set({ user: null, profile: null })
+          return
+        }
         set({ user: session.user, profile })
       } else {
         set({ user: null, profile: null })
+        setLocalSessionId(null)
       }
     })
 
@@ -105,6 +158,36 @@ const useAuthStore = create((set, get) => ({
     let profile = await get().fetchProfile(data.user.id)
     if (!profile) profile = await ensureProfileRow(data.user, name.trim())
     set({ user: data.user, profile })
+    await get().claimSession(data.user.id)
+    return data
+  },
+
+  completeOnboarding: async (updates) => {
+    const user = get().user
+    if (!user) return null
+    const payload = { ...updates, onboarding_completed: true }
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', user.id)
+      .select()
+      .single()
+    if (error?.message?.includes('onboarding_completed') || error?.message?.includes('preferences')) {
+      const fallback = { ...updates }
+      delete fallback.onboarding_completed
+      delete fallback.preferences
+      const res = await supabase.from('profiles').update(fallback).eq('id', user.id).select().single()
+      if (res.data) {
+        const merged = {
+          ...res.data,
+          onboarding_completed: true,
+          preferences: updates.preferences,
+        }
+        set({ profile: merged })
+        return merged
+      }
+    }
+    if (data) set({ profile: data })
     return data
   },
 
@@ -129,10 +212,12 @@ const useAuthStore = create((set, get) => ({
     let profile = await get().fetchProfile(data.user.id)
     if (!profile) profile = await ensureProfileRow(data.user)
     set({ user: data.user, profile })
+    await get().claimSession(data.user.id)
     return data
   },
 
   logout: async () => {
+    setLocalSessionId(null)
     await supabase.auth.signOut()
     set({ user: null, profile: null })
   },

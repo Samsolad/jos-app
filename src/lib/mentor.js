@@ -10,12 +10,17 @@ const TONES = {
 }
 
 // ── PICK PERSONALITY ──────────────────────────────────────────────
-export function pickPersonality(sit) {
+export function pickPersonality(sit, profile) {
+  const style = profile?.notif_style || 'balanced'
   if (!sit) return 'pa'
-  if (['idle', 'slack', 'no_activity', 'missed'].includes(sit)) return 'tough'
-  if (['win', 'complete', 'celebrate', 'done'].includes(sit))   return 'warm'
-  if (['next', 'push', 'motivate', 'start', 'next_task'].includes(sit)) return 'hype'
-  if (['advice', 'deadline', 'strategy', 'wise', 'eod'].includes(sit))  return 'wise'
+  if (['idle', 'slack', 'no_activity', 'missed'].includes(sit)) {
+    return style === 'gentle' ? 'wise' : 'tough'
+  }
+  if (['win', 'complete', 'celebrate', 'done'].includes(sit)) return 'warm'
+  if (['next', 'push', 'motivate', 'start', 'next_task', 'morning_briefing'].includes(sit)) {
+    return style === 'strict' ? 'hype' : 'pa'
+  }
+  if (['advice', 'deadline', 'strategy', 'wise', 'eod', 'weekly_review'].includes(sit)) return 'wise'
   return 'pa'
 }
 
@@ -63,13 +68,22 @@ export async function mentorMessage(sit, context, profile) {
   const ctx      = context  || {}
   const prof     = profile  || {}
 
-  const personality = pickPersonality(safeSit)
+  const personality = pickPersonality(safeSit, prof)
   const sys         = TONES[personality] || TONES.pa
   const name        = prof?.name?.split(' ')[0] || 'there'
+  const styleNote   = prof?.notif_style === 'strict'
+    ? 'Be direct and demanding.'
+    : prof?.notif_style === 'gentle'
+      ? 'Be warm and encouraging.'
+      : 'Be balanced — firm but supportive.'
 
   let prompt
 
-  if (safeSit === 'next_task') {
+  if (safeSit === 'morning_briefing') {
+    prompt = `${styleNote} Morning briefing for ${name}. Projects: ${ctx.projects || 'none'}. Active goals: ${ctx.goals || 'none'}. Pending tasks: ${ctx.tasks || 0}. Give a sharp 2-sentence briefing for what kind of day this is and the one thing they must not ignore.`
+  } else if (safeSit === 'weekly_review') {
+    prompt = `${styleNote} Monday weekly review for ${name}. Tasks done last week context: ${ctx.done || 0} completed, ${ctx.pending || 0} still open. Goals: ${ctx.goals || 'none'}. Habits: ${ctx.habits || 'none'}. Revenue net: ${ctx.revenue || 'unknown'}. Give a concise weekly debrief in 3-4 sentences weaving tough love, warmth, and strategy where appropriate.`
+  } else if (safeSit === 'next_task') {
     prompt = `${name} just completed a task. Their next task is: "${ctx.task || 'unknown'}" on project "${ctx.project || 'unknown'}". Tell them what is next and push them to start immediately.`
   } else if (safeSit === 'idle') {
     prompt = `${name} has been idle for ${ctx.minutes || 20} minutes. Their current task is: "${ctx.task || 'nothing specific'}". Call them out and get them back on track.`

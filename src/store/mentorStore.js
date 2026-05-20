@@ -29,7 +29,7 @@ const useMentorStore = create((set, get) => ({
     const acts = actionsIn || []
     const sit  = situationIn || 'pa'
 
-    const personality = pickPersonality(sit)
+    const personality = pickPersonality(sit, prof)
 
     // For motivate — show immediate placeholder so sound fires in gesture tick
     if (sit === 'motivate') {
