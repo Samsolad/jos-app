@@ -4,6 +4,7 @@ import useAuthStore from './store/authStore'
 import { isOnboardingComplete } from './lib/dashboardPrefs'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import ResetPassword from './pages/auth/ResetPassword'
 import Marketing from './pages/Marketing'
 import OnboardingWizard from './pages/onboarding/OnboardingWizard'
 import Layout from './pages/app/Layout'
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/welcome" element={<Marketing />} />
         <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
         <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingWizard /></OnboardingRoute>} />
 
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>

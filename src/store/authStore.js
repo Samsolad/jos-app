@@ -221,6 +221,33 @@ const useAuthStore = create((set, get) => ({
     await supabase.auth.signOut()
     set({ user: null, profile: null })
   },
+
+  requestPasswordReset: async (email) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error(supabaseConfigError || 'App is missing Supabase configuration.')
+    }
+    const trimmedEmail = email.trim()
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    if (error) {
+      const wrapped = new Error(formatSupabaseAuthError(error))
+      wrapped.cause = error
+      throw wrapped
+    }
+  },
+
+  updatePassword: async (password) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error(supabaseConfigError || 'App is missing Supabase configuration.')
+    }
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) {
+      const wrapped = new Error(formatSupabaseAuthError(error))
+      wrapped.cause = error
+      throw wrapped
+    }
+  },
 }))
 
 export default useAuthStore
