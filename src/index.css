@@ -91,10 +91,9 @@ html, body, #root {
   transition: background-color 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth);
 }
 
-/* iOS safe area */
-header {
+/* App shell safe-area — components set their own heights */
+.app-header {
   padding-top: env(safe-area-inset-top);
-  height: calc(48px + env(safe-area-inset-top));
 }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }

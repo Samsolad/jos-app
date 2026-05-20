@@ -244,25 +244,29 @@ export default function Chat() {
       {/* Main conversation column */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Minimal top bar */}
-        <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-jos-border bg-jos-bg/90 backdrop-blur-md">
-          <div className="flex items-center gap-3 min-w-0">
-            <GradientOrb state={aiState} size="md" />
+        <div
+          className="app-header flex-shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-jos-border bg-jos-bg/90 backdrop-blur-md"
+          style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}
+        >
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <GradientOrb state={aiState} size="sm" className="sm:hidden flex-shrink-0" />
+            <GradientOrb state={aiState} size="md" className="hidden sm:flex flex-shrink-0" />
             <div className="min-w-0">
-              <h1 className="font-display text-[16px] sm:text-[18px] font-semibold text-jos-text truncate">
-                J·OS <span className="jos-gradient-text">Assistant</span>
+              <h1 className="font-display text-[15px] sm:text-[18px] font-semibold text-jos-text truncate">
+                J·OS <span className="jos-gradient-text">AI</span>
               </h1>
-              <p className="text-[11px] text-jos-muted truncate">
+              <p className="hidden sm:block text-[11px] text-jos-muted truncate">
                 {loading ? 'Thinking…' : `Here for you, ${firstName}`}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
             <Link
               to="/"
-              className="md:hidden text-[11px] text-jos-muted hover:text-jos-text px-2 py-1"
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-jos-muted hover:text-jos-text hover:bg-jos-surface-2"
               aria-label="Back to Command Hub"
             >
-              ← Hub
+              ←
             </Link>
             <ThemeToggle />
             <button
@@ -275,10 +279,10 @@ export default function Chat() {
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-[11px] px-3 py-1.5 rounded-lg border border-jos-border text-jos-muted hover:text-jos-text"
+              className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg border border-jos-border text-jos-muted hover:text-jos-text"
               aria-label="Open context sidebar"
             >
-              Context
+              <span className="text-base" aria-hidden>☰</span>
             </button>
           </div>
         </div>

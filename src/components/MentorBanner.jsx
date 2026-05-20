@@ -65,7 +65,7 @@ export default function MentorBanner() {
 
   return (
     <div
-      className={`fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-24px)] max-w-[540px] bg-[#111] border border-[#2a2a2a] border-t-2 ${mode.border} rounded-lg shadow-2xl animate-fadeUp`}
+      className={`fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom)+8px)] md:bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-[540px] bg-jos-surface border border-jos-border border-t-2 ${mode.border} rounded-lg shadow-2xl animate-fadeUp`}
     >
       <div className="flex items-start gap-3 p-4">
         <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${mode.dot}`} />

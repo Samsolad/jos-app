@@ -117,17 +117,20 @@ export default function Layout() {
 
       {!isChat && (
         <header
-          className="flex items-center justify-between px-4 sm:px-6 border-b border-jos-border bg-jos-bg/95 backdrop-blur-xl flex-shrink-0 sticky top-0 z-50"
+          className="app-header flex items-center justify-between px-3 sm:px-6 border-b border-jos-border bg-jos-bg/95 backdrop-blur-xl flex-shrink-0 sticky top-0 z-50"
           style={{
             paddingTop: 'env(safe-area-inset-top)',
             height: 'calc(52px + env(safe-area-inset-top))',
           }}
         >
-          <div className="text-[14px] sm:text-[15px] font-bold tracking-tight font-display">
-            J·OS <span className="text-jos-muted font-normal mx-1">/</span>
-            <span className="text-jos-muted font-medium text-[12px] sm:text-[13px]">{sectionName}</span>
+          <div className="min-w-0 flex-1 mr-2">
+            <p className="text-[14px] sm:text-[15px] font-bold tracking-tight font-display truncate">
+              <span className="text-jos-text">J·OS</span>
+              <span className="text-jos-muted font-normal mx-1 hidden min-[400px]:inline">/</span>
+              <span className="text-jos-muted font-medium text-[12px] sm:text-[13px]">{sectionName}</span>
+            </p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             <span className="text-[9px] sm:text-[10px] tracking-[0.14em] uppercase text-jos-muted hidden sm:inline">
               {todayStr}
             </span>
@@ -177,7 +180,7 @@ export default function Layout() {
 
       <div className="flex flex-1 overflow-hidden">
         <nav
-          className={`hidden md:flex w-14 flex-shrink-0 border-r border-jos-border flex-col items-center py-3 gap-0.5 bg-jos-bg overflow-y-auto ${
+          className={`hidden md:flex w-[52px] xl:w-[76px] flex-shrink-0 border-r border-jos-border flex-col items-center py-3 gap-1 bg-jos-bg overflow-y-auto ${
             isChat ? 'border-jos-border/50' : ''
           }`}
           aria-label="Main navigation"
@@ -187,8 +190,10 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               end={item.to === '/'}
+              title={item.label}
+              aria-label={item.label}
               className={({ isActive }) =>
-                `w-11 h-11 flex flex-col items-center justify-center gap-0.5 rounded-lg transition-all duration-150 ${
+                `w-11 xl:w-[68px] min-h-[44px] flex flex-col items-center justify-center gap-1 rounded-lg transition-all duration-150 px-1 ${
                   isActive
                     ? 'bg-jos-surface border border-jos-accent/40 shadow-glow-cyan'
                     : 'border border-transparent hover:bg-jos-surface-2'
@@ -197,11 +202,15 @@ export default function Layout() {
             >
               {({ isActive }) => (
                 <>
-                  <span className={`text-[13px] leading-none ${item.to === '/chat' && isActive ? 'text-jos-accent' : ''}`}>
+                  <span
+                    className={`text-[16px] xl:text-[15px] leading-none ${
+                      item.to === '/chat' && isActive ? 'text-jos-accent' : ''
+                    }`}
+                  >
                     {item.icon}
                   </span>
                   <span
-                    className={`text-[7px] font-semibold tracking-[0.5px] uppercase ${
+                    className={`hidden xl:block text-[9px] font-medium leading-tight text-center w-full truncate ${
                       isActive ? 'text-jos-text' : 'text-jos-muted'
                     }`}
                   >
@@ -215,7 +224,9 @@ export default function Layout() {
 
         <main
           className={`flex-1 overflow-y-auto ${
-            isChat ? 'p-0 overflow-hidden' : 'p-4 sm:p-7 pb-24 md:pb-10'
+            isChat
+              ? 'p-0 overflow-hidden'
+              : 'p-4 sm:p-7 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-10'
           }`}
         >
           <Outlet />
@@ -224,27 +235,27 @@ export default function Layout() {
 
       {!isChat && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-jos-bg/95 backdrop-blur-xl border-t border-jos-border z-50">
-          <div className="flex items-center justify-around h-[56px] px-1">
+          <nav className="grid grid-cols-5 items-stretch min-h-[52px] px-0.5" aria-label="Mobile navigation">
             {MOBILE_NAV.map((item) => {
               if (item.to === '/more') {
                 return (
-                  <div key="more" className="relative" id="more-menu-area">
+                  <div key="more" className="relative flex" id="more-menu-area">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         setMoreOpen(!moreOpen)
                       }}
-                      className="flex flex-col items-center justify-center gap-0.5 w-12 h-12 rounded-lg"
+                      className={`flex flex-1 flex-col items-center justify-center min-h-[48px] rounded-lg transition-colors ${
+                        moreOpen ? 'bg-jos-surface text-jos-text' : 'text-jos-muted'
+                      }`}
                       aria-expanded={moreOpen}
+                      aria-label="More menu"
                     >
-                      <span className="text-[15px] leading-none">≡</span>
-                      <span className="text-[8px] font-semibold tracking-[0.5px] uppercase text-jos-muted">
-                        More
-                      </span>
+                      <span className="text-[20px] leading-none" aria-hidden>≡</span>
                     </button>
                     {moreOpen && (
-                      <div className="absolute bottom-14 right-0 jos-card p-2 min-w-[160px] shadow-xl z-50 animate-fadeIn">
+                      <div className="absolute bottom-[calc(100%+8px)] right-1 jos-card p-2 min-w-[168px] max-w-[min(100vw-16px,220px)] shadow-xl z-50 animate-fadeIn">
                         {MORE_ITEMS.map((mi) => (
                           <button
                             key={mi.to}
@@ -277,34 +288,30 @@ export default function Layout() {
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
+                  aria-label={item.label}
+                  title={item.label}
                   className={({ isActive }) =>
-                    `flex flex-col items-center justify-center gap-0.5 w-12 h-12 rounded-lg transition-all ${
-                      isActive ? 'bg-jos-surface' : ''
+                    `flex flex-col items-center justify-center min-h-[48px] rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-jos-surface text-jos-text'
+                        : 'text-jos-muted hover:text-jos-text'
                     }`
                   }
                 >
                   {({ isActive }) => (
-                    <>
-                      <span
-                        className={`text-[15px] leading-none ${
-                          item.to === '/chat' && isActive ? 'text-jos-accent' : ''
-                        }`}
-                      >
-                        {item.icon}
-                      </span>
-                      <span
-                        className={`text-[8px] font-semibold tracking-[0.5px] uppercase ${
-                          isActive ? 'text-jos-text' : 'text-jos-muted'
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                    </>
+                    <span
+                      className={`text-[20px] leading-none ${
+                        item.to === '/chat' && isActive ? 'text-jos-accent' : ''
+                      }`}
+                      aria-hidden
+                    >
+                      {item.icon}
+                    </span>
                   )}
                 </NavLink>
               )
             })}
-          </div>
+          </nav>
           <div className="h-[env(safe-area-inset-bottom)]" />
         </div>
       )}
