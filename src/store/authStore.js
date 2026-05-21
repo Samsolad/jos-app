@@ -170,30 +170,49 @@ const useAuthStore = create((set, get) => ({
   completeOnboarding: async (updates) => {
     const user = get().user
     if (!user) return null
-    const payload = { ...updates, onboarding_completed: true }
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(payload)
-      .eq('id', user.id)
-      .select()
-      .single()
-    if (error?.message?.includes('onboarding_completed') || error?.message?.includes('preferences')) {
-      const fallback = { ...updates }
-      delete fallback.onboarding_completed
-      delete fallback.preferences
-      const res = await supabase.from('profiles').update(fallback).eq('id', user.id).select().single()
-      if (res.data) {
-        const merged = {
-          ...res.data,
-          onboarding_completed: true,
-          preferences: updates.preferences,
-        }
-        set({ profile: merged })
-        return merged
+
+    const preferences = updates.preferences
+    const base = { ...updates, onboarding_completed: true }
+
+    const tryUpdate = async (payload) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', user.id)
+        .select()
+        .single()
+      if (error) {
+        console.warn('[auth] onboarding update:', error.message)
+        return null
       }
+      return data
     }
-    if (data) set({ profile: data })
-    return data
+
+    let saved = await tryUpdate(base)
+
+    if (!saved) {
+      const { preferences: _p, onboarding_completed: _o, ...rest } = base
+      if (Object.keys(rest).length) saved = await tryUpdate(rest)
+    }
+    if (!saved && preferences) {
+      saved = await tryUpdate({ preferences, onboarding_completed: true })
+    }
+    if (!saved) {
+      saved = await tryUpdate({ onboarding_completed: true })
+    }
+
+    const merged = {
+      ...(get().profile || {}),
+      ...(saved || {}),
+      ...updates,
+      onboarding_completed: true,
+      preferences: preferences ?? saved?.preferences ?? get().profile?.preferences,
+    }
+    set({ profile: merged })
+    try {
+      localStorage.setItem('jos_onboarding_complete', user.id)
+    } catch { /* ignore */ }
+    return merged
   },
 
   login: async (email, password) => {

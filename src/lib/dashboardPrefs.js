@@ -58,10 +58,13 @@ export function getDashboardSections(profile) {
 export function isOnboardingComplete(profile) {
   if (profile?.onboarding_completed === true) return true
   try {
+    if (profile?.id && localStorage.getItem('jos_onboarding_complete') === profile.id) {
+      return true
+    }
     const p = typeof profile?.preferences === 'string'
       ? JSON.parse(profile.preferences)
       : profile?.preferences
-    if (p?.completedAt) return true
+    if (p?.completedAt || p?.onboarding?.completedAt) return true
   } catch { /* ignore */ }
   // Legacy accounts that set up profile before the wizard existed
   if (profile?.role && profile?.about) return true

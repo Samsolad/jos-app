@@ -16,13 +16,13 @@ const useProjectStore = create((set, get) => ({
     set({ projects: data || [], loading: false })
   },
 
-  addProject: async (name, status = 'Active', notes = '') => {
+  addProject: async (name, status = 'Active', notes = '', options = {}) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const profile = useAuthStore.getState().profile
     const limits = getLimits(profile)
     const count = get().projects.length
-    if (isAtLimit(count, limits.projects)) {
+    if (!options.skipLimit && isAtLimit(count, limits.projects)) {
       throw new Error(`Free plan allows up to ${limits.projects} projects. Upgrade to Personal for unlimited.`)
     }
     const { data } = await supabase

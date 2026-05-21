@@ -52,6 +52,7 @@ export default function OnboardingWizard() {
 
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [form, setForm] = useState({
     role: '',
     employer: '',
@@ -76,19 +77,35 @@ export default function OnboardingWizard() {
     }))
   }
 
+  const seedOnboardingData = async (projects, goals, habits, platforms, familyLines) => {
+    const tasks = [
+      ...projects.slice(0, 10).map((name) =>
+        addProject(name, 'Active', '', { skipLimit: true }).catch(() => null),
+      ),
+      ...goals.slice(0, 10).map((text) =>
+        addGoal({ text, category: 'Personal', steps: [] }).catch(() => null),
+      ),
+      ...habits.slice(0, 10).map((name) =>
+        addHabit(name, 'daily').catch(() => null),
+      ),
+      ...platforms.map((platform) =>
+        addPlatform(platform).catch(() => null),
+      ),
+      ...familyLines.slice(0, 10).map((line) =>
+        addContact(line).catch(() => null),
+      ),
+    ]
+    await Promise.allSettled(tasks)
+  }
+
   const finish = async () => {
     setSaving(true)
+    setSaveError('')
     const projects = parseLines(form.projectsText)
     const goals = parseLines(form.goalsText)
     const habits = parseLines(form.habitsText)
     const familyLines = parseLines(form.familyText)
     const roleCombined = [form.role, form.employer].filter(Boolean).join(' · ')
-
-    for (const name of projects.slice(0, 10)) await addProject(name, 'Active', '')
-    for (const text of goals.slice(0, 10)) await addGoal({ text, category: 'Personal', steps: [] })
-    for (const name of habits.slice(0, 10)) await addHabit(name, 'daily')
-    for (const platform of form.platforms) await addPlatform(platform)
-    for (const line of familyLines.slice(0, 10)) await addContact(line)
 
     const onboardingAnswers = {
       projects, goals, habits,
@@ -105,23 +122,33 @@ export default function OnboardingWizard() {
       ].filter(Boolean),
     }
 
-    await completeOnboarding({
-      name: profile?.name,
-      role: roleCombined || profile?.role,
-      location: form.location || profile?.location,
-      timezone: form.timezone || profile?.timezone,
-      currency: form.currency,
-      notif_style: form.notif_style,
-      onboarding_completed: true,
-      preferences: {
-        sections: sectionsFromOnboarding(onboardingAnswers),
-        onboarding: onboardingAnswers,
-        completedAt: new Date().toISOString(),
-      },
-    })
+    try {
+      const completed = await completeOnboarding({
+        name: profile?.name,
+        role: roleCombined || profile?.role,
+        location: form.location || profile?.location,
+        timezone: form.timezone || profile?.timezone,
+        currency: form.currency,
+        notif_style: form.notif_style,
+        onboarding_completed: true,
+        preferences: {
+          sections: sectionsFromOnboarding(onboardingAnswers),
+          onboarding: onboardingAnswers,
+          completedAt: new Date().toISOString(),
+        },
+      })
 
-    setSaving(false)
-    navigate('/', { replace: true })
+      if (!completed) {
+        throw new Error('Could not save your setup. Check your connection and try again.')
+      }
+
+      await seedOnboardingData(projects, goals, habits, form.platforms, familyLines)
+      navigate('/', { replace: true })
+    } catch (err) {
+      setSaveError(err?.message || 'Something went wrong finishing setup.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const next = () => (step < STEPS.length - 1 ? setStep(s => s + 1) : finish())
@@ -203,9 +230,14 @@ export default function OnboardingWizard() {
         )}
       </div>
 
-      <div className="px-6 py-5 border-t border-[#1f1f1f] flex gap-2 max-w-lg mx-auto w-full">
-        <button type="button" onClick={skip} disabled={saving} className="flex-1 py-3 text-[11px] font-semibold tracking-[0.1em] uppercase text-[#888] border border-[#2a2a2a] rounded hover:text-white transition-colors">Skip</button>
-        <Button type="button" size="full" className="flex-[2]" disabled={saving} onClick={next}>{saving ? 'Building your OS…' : step === STEPS.length - 1 ? 'Finish' : 'Continue'}</Button>
+      <div className="px-6 py-5 border-t border-[#1f1f1f] max-w-lg mx-auto w-full">
+        {saveError && (
+          <p className="text-[11px] text-red-400 mb-3">{saveError}</p>
+        )}
+        <div className="flex gap-2">
+          <button type="button" onClick={skip} disabled={saving} className="flex-1 py-3 text-[11px] font-semibold tracking-[0.1em] uppercase text-[#888] border border-[#2a2a2a] rounded hover:text-white transition-colors">Skip</button>
+          <Button type="button" size="full" className="flex-[2]" disabled={saving} onClick={next}>{saving ? 'Building your OS…' : step === STEPS.length - 1 ? 'Finish' : 'Continue'}</Button>
+        </div>
       </div>
     </div>
   )
