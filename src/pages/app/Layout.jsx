@@ -32,6 +32,7 @@ const MORE_ITEMS = [
   { to: '/revenue', icon: '⊘', label: 'Money' },
   { to: '/family', icon: '⊗', label: 'Family' },
   { to: '/profile', icon: '⊙', label: 'Profile' },
+  { to: '/integrations', icon: '⊜', label: 'Connect' },
   { to: '/investors', icon: '◎', label: 'Invest' },
 ]
 
@@ -45,6 +46,7 @@ const SECTION_NAMES = {
   '/family': 'Family',
   '/chat': 'AI Assistant',
   '/profile': 'Profile',
+  '/integrations': 'Integrations',
 }
 
 export default function Layout() {

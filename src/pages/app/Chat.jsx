@@ -4,6 +4,7 @@ import useAuthStore from '../../store/authStore'
 import useProjectStore from '../../store/projectStore'
 import useGoalStore from '../../store/goalStore'
 import useHabitStore from '../../store/habitStore'
+import useChatStore from '../../store/chatStore'
 import { askLLM } from '../../lib/llm'
 import {
   chatMessagesRemaining,
@@ -19,7 +20,6 @@ import ConversationSidebar from '../../components/ai/ConversationSidebar'
 import ChatInputBar from '../../components/ai/ChatInputBar'
 import ThemeToggle from '../../components/ui/ThemeToggle'
 
-const CHAT_HISTORY_KEY = 'jos_chat_history'
 const PERSONALITY_KEY = 'jos_ai_personality'
 const MAX_MESSAGES = 40
 
@@ -109,7 +109,11 @@ export default function Chat() {
   const { goals } = useGoalStore()
   const { habits } = useHabitStore()
 
-  const [messages, setMessages] = useState([])
+  const messages = useChatStore((s) => s.messages)
+  const setMessages = useChatStore((s) => s.setMessages)
+  const loadMessages = useChatStore((s) => s.loadMessages)
+  const appendMessage = useChatStore((s) => s.appendMessage)
+  const clearMessages = useChatStore((s) => s.clearMessages)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [limitError, setLimitError] = useState('')
@@ -122,19 +126,12 @@ export default function Chat() {
   const endRef = useRef(null)
 
   useEffect(() => {
+    loadMessages()
     try {
-      const saved = localStorage.getItem(CHAT_HISTORY_KEY)
-      if (saved) setMessages(JSON.parse(saved).slice(-MAX_MESSAGES))
       const p = localStorage.getItem(PERSONALITY_KEY)
       if (p) setPersonality(p)
     } catch { /* ignore */ }
-  }, [])
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)))
-    }
-  }, [messages])
+  }, [loadMessages])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -180,37 +177,29 @@ export default function Chat() {
     trackEvent(EVENT_TYPES.CHAT_SENT, { length: msg.length })
 
     const userMsg = { role: 'user', content: msg }
-    const updated = [...messages, userMsg].slice(-MAX_MESSAGES)
-    setMessages(updated)
+    await appendMessage(userMsg)
+    const snapshot = useChatStore.getState().messages.slice(-MAX_MESSAGES)
     setLoading(true)
 
     try {
       const memoryCtx = await buildMemoryContext(msg)
       const sys = buildSystem(profile, projects, goals, habits, personality) + memoryCtx
-      const reply = await askLLM(updated.slice(-12), sys)
-      setMessages((prev) =>
-        [...prev, { role: 'assistant', content: reply, confidence: 0.85 }].slice(-MAX_MESSAGES),
-      )
+      const reply = await askLLM(snapshot.slice(-12), sys)
+      await appendMessage({ role: 'assistant', content: reply, confidence: 0.85 })
     } catch (err) {
-      setMessages((prev) =>
-        [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Something went wrong: ${err?.message || 'Please try again.'}`,
-            confidence: 0.3,
-          },
-        ].slice(-MAX_MESSAGES),
-      )
+      await appendMessage({
+        role: 'assistant',
+        content: `Something went wrong: ${err?.message || 'Please try again.'}`,
+        confidence: 0.3,
+      })
     } finally {
       setLoading(false)
       setShowReasoning(false)
     }
-  }, [input, loading, messages, profile, projects, goals, habits, personality])
+  }, [input, loading, messages, profile, projects, goals, habits, personality, appendMessage])
 
   const clearChat = () => {
-    setMessages([])
-    localStorage.removeItem(CHAT_HISTORY_KEY)
+    clearMessages()
   }
 
   const startVoice = () => {

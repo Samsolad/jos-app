@@ -7,6 +7,9 @@ import { askLLM } from '../../lib/llm'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import { generateQuoteCard } from '../../lib/cardGenerator'
+import useIntegrationStore from '../../store/integrationStore'
+import { canUseIntegrations } from '../../lib/subscription'
+import { Link } from 'react-router-dom'
 
 const ALL_PLATFORMS = [
   { name: 'LinkedIn',   icon: '💼', needsCopy: false, hasImage: false, connectUrl: 'https://www.linkedin.com' },
@@ -39,6 +42,7 @@ export default function Social() {
   } = useSocialStore()
 
   const profile  = useAuthStore(s => s.profile)
+  const queueSocialPost = useIntegrationStore(s => s.queueSocialPost)
   const { projects } = useProjectStore()
   const { goals }    = useGoalStore()
 
@@ -48,6 +52,7 @@ export default function Social() {
   const [savedId,         setSavedId]         = useState(null)
   const [showPlatManager, setShowPlatManager] = useState(false)
   const [tab,             setTab]             = useState('draft')
+  const [queueNote,       setQueueNote]       = useState('')
   const [copied,          setCopied]          = useState(false)
   const [generatingImg,   setGeneratingImg]   = useState(false)
   const [generatedImg,    setGeneratedImg]    = useState(null)
@@ -259,7 +264,9 @@ export default function Social() {
 
           <p className="text-[11px] text-[#444] font-light mt-4 leading-relaxed">
             Instagram, TikTok, X, Threads and YouTube use copy and paste.
-            LinkedIn and Facebook support future direct integration.
+            LinkedIn and Facebook: connect tokens in{' '}
+            <Link to="/integrations" className="text-jos-accent underline">Integrations</Link>
+            {' '}to queue approved posts.
           </p>
         </div>
       )}
@@ -391,14 +398,37 @@ export default function Social() {
                         </Button>
                       </>
                     ) : (
-                      <Button variant="green" size="sm" onClick={handleMarkPosted}>
-                        ✓ Mark Posted
-                      </Button>
+                      <>
+                        <Button variant="green" size="sm" onClick={handleMarkPosted}>
+                          ✓ Mark Posted
+                        </Button>
+                        {canUseIntegrations(profile) &&
+                          ['LinkedIn', 'Facebook'].includes(effectivePlat) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              const plat = effectivePlat === 'LinkedIn' ? 'linkedin' : 'facebook'
+                              try {
+                                const res = await queueSocialPost(plat, draft)
+                                setQueueNote(res?.note || 'Queued for publishing')
+                              } catch (e) {
+                                setQueueNote(e.message)
+                              }
+                            }}
+                          >
+                            Queue via API
+                          </Button>
+                        )}
+                      </>
                     )}
                     <Button variant="ghost" size="sm" onClick={handleDraft}>
                       ↻ Regenerate
                     </Button>
                   </div>
+                  {queueNote && (
+                    <p className="text-[11px] text-jos-muted mb-3">{queueNote}</p>
+                  )}
 
                   {/* Image generation — visual platforms only */}
                   {activePlatInfo?.hasImage && (

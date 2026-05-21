@@ -25,6 +25,32 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 2. SQL Editor → paste `supabase/migrations/003_phase2.sql` → **Run**.
 3. Deploy edge function **`embed-memory`** (same steps as `gemini-proxy`, code from `supabase/functions/embed-memory/index.ts`). Uses the same `GEMINI_API_KEY` secret.
 
+### 0d. Phase 3 — integrations, chat persistence, teams
+
+1. SQL Editor → paste `supabase/migrations/004_phase3.sql` → **Run**.
+   - If you see `column "session_id" does not exist`, an older `chat_messages` table is already in the DB. Re-run the updated `004_phase3.sql` (it adds missing columns), or run only:
+     ```sql
+     ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS session_id text DEFAULT 'default';
+     CREATE INDEX IF NOT EXISTS chat_messages_user_session_idx
+       ON chat_messages (user_id, session_id, created_at DESC);
+     ```
+2. Deploy edge function **`integrations`** (`supabase/functions/integrations/index.ts`).
+3. Edge Function **Secrets** (in addition to `GEMINI_API_KEY`):
+
+| Secret | Purpose |
+|--------|---------|
+| `GOOGLE_CLIENT_ID` | Google Cloud OAuth client (Gmail + Calendar) |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional — refreshes tokens reliably (Dashboard → Settings → API) |
+
+4. **Google Cloud Console** → APIs & Services:
+   - Enable **Gmail API** and **Google Calendar API**
+   - OAuth consent screen → add test users
+   - Credentials → OAuth 2.0 Web client
+   - **Authorized redirect URI:** `https://YOUR_APP_DOMAIN/integrations/callback` (and `http://localhost:5173/integrations/callback` for local dev)
+
+5. In the app: **More → Connect** (or Profile → Integrations). Connect Google, scan inbox, block top-priority tasks on Calendar.
+
 ---
 
 ## 1. Gemini secret (server-side API key)
@@ -55,6 +81,12 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 1. Edge Functions → create **`embed-memory`**.
 2. Paste `supabase/functions/embed-memory/index.ts`.
 3. Deploy. Requires `GEMINI_API_KEY` (same secret as gemini-proxy).
+
+### 2c. Deploy `integrations` (Phase 3 — Gmail, Calendar, social queue)
+
+1. Edge Functions → create **`integrations`**.
+2. Paste `supabase/functions/integrations/index.ts`.
+3. Deploy. Set secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and optionally `SUPABASE_SERVICE_ROLE_KEY`.
 
 ---
 

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import useAuthStore from '../../store/authStore'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { getTier, tierLabel, LIMITS } from '../../lib/subscription'
+import { Link } from 'react-router-dom'
+import { getTier, tierLabel, LIMITS, canUseIntegrations } from '../../lib/subscription'
 import { authorityDescription, AUTH_LABELS, getAuthorityLevel } from '../../lib/authority'
 import { getBehaviourSummary } from '../../lib/behaviour'
 import { ingestMemory } from '../../lib/memory'
@@ -233,6 +234,14 @@ export default function Profile() {
         <p className="text-[10px] text-[#444]">
           Stripe billing — Phase 5. Limits: {LIMITS[getTier(profile)]?.projects === Infinity ? '∞' : LIMITS[getTier(profile)]?.projects} projects, {LIMITS[getTier(profile)]?.chatMessagesPerDay === Infinity ? '∞' : LIMITS[getTier(profile)]?.chatMessagesPerDay} AI msgs/day.
         </p>
+        {canUseIntegrations(profile) && (
+          <Link
+            to="/integrations"
+            className="inline-block mt-3 text-[11px] text-jos-accent hover:underline"
+          >
+            Open Integrations (Gmail, Calendar, WhatsApp) →
+          </Link>
+        )}
       </div>
 
       {/* Progressive Authority */}

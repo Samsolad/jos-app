@@ -4,6 +4,7 @@ export const TIERS = {
   free: 'free',
   personal: 'personal',
   operator: 'operator',
+  team: 'team',
 }
 
 export const LIMITS = {
@@ -20,6 +21,8 @@ export const LIMITS = {
     dailyFocus: false,
     weeklyReview: false,
     morningBriefingVoice: true,
+    integrations: false,
+    teamFeatures: false,
   },
   personal: {
     projects: Infinity,
@@ -34,6 +37,8 @@ export const LIMITS = {
     dailyFocus: true,
     weeklyReview: true,
     morningBriefingVoice: true,
+    integrations: true,
+    teamFeatures: false,
   },
   operator: {
     projects: Infinity,
@@ -48,6 +53,24 @@ export const LIMITS = {
     dailyFocus: true,
     weeklyReview: true,
     morningBriefingVoice: true,
+    integrations: true,
+    teamFeatures: false,
+  },
+  team: {
+    projects: Infinity,
+    goals: Infinity,
+    habits: Infinity,
+    chatMessagesPerDay: Infinity,
+    socialPlatforms: Infinity,
+    familyContacts: Infinity,
+    reminders: Infinity,
+    investors: Infinity,
+    mentorTriggers: 'all',
+    dailyFocus: true,
+    weeklyReview: true,
+    morningBriefingVoice: true,
+    integrations: true,
+    teamFeatures: true,
   },
 }
 
@@ -104,5 +127,11 @@ export function chatMessagesRemaining(profile) {
 export function tierLabel(tier) {
   if (tier === 'personal') return 'Personal'
   if (tier === 'operator') return 'Operator'
+  if (tier === 'team') return 'Team'
   return 'Free'
+}
+
+export function canUseIntegrations(profile) {
+  const limits = getLimits(profile)
+  return limits.integrations !== false
 }

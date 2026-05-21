@@ -18,6 +18,8 @@ import Family from './pages/app/Family'
 import Chat from './pages/app/Chat'
 import Profile from './pages/app/Profile'
 import Investors from './pages/app/Investors'
+import Integrations from './pages/app/Integrations'
+import OAuthCallback from './pages/integrations/OAuthCallback'
 
 function Spinner() {
   return (
@@ -70,6 +72,10 @@ export default function App() {
         <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
         <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route
+          path="/integrations/callback"
+          element={<ProtectedRoute><OAuthCallback /></ProtectedRoute>}
+        />
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingWizard /></OnboardingRoute>} />
 
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -82,6 +88,7 @@ export default function App() {
           <Route path="family" element={<Family />} />
           <Route path="chat" element={<Chat />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="integrations" element={<Integrations />} />
           <Route path="investors" element={<Investors />} />
         </Route>
 
