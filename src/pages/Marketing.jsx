@@ -1,9 +1,11 @@
 ﻿import { Link } from 'react-router-dom'
 import Button from '../components/ui/Button'
+import HowItWorksGuide from '../components/HowItWorksGuide'
 
 export default function Marketing() {
   return (
-    <div className="min-h-screen bg-[#080808] text-white">
+    <div className="min-h-screen bg-[#080808] text-white relative">
+      <HowItWorksGuide />
       <header className="flex items-center justify-between px-6 sm:px-12 py-6 border-b border-[#1f1f1f]">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">J·OS</h1>
