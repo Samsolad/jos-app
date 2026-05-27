@@ -6,6 +6,8 @@ import {
   exchangeGoogleCode,
   disconnectProvider,
   invokeIntegration,
+  OAUTH_STATE_KEY,
+  saveSocialToken as saveSocialTokenApi,
 } from '../lib/integrations'
 import { listRecentEmails, extractCommitmentsFromEmails, saveInboxItems } from '../lib/gmail'
 import { listCalendarEvents, autoBlockTopTask } from '../lib/calendar'
@@ -35,10 +37,13 @@ const useIntegrationStore = create((set, get) => ({
     if (url) window.location.href = url
   },
 
-  finishGoogleOAuth: async (code) => {
+  finishGoogleOAuth: async (code, state) => {
     set({ loading: true, error: null })
     try {
-      await exchangeGoogleCode(code)
+      await exchangeGoogleCode(code, state)
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(OAUTH_STATE_KEY)
+      }
       await get().loadStatus()
     } catch (err) {
       set({ error: err.message })
@@ -128,16 +133,7 @@ const useIntegrationStore = create((set, get) => ({
   },
 
   saveSocialToken: async (platform, token) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('user_integrations').upsert({
-      user_id: user.id,
-      provider: platform,
-      access_token: token,
-      status: 'connected',
-      metadata: { manual_token: true },
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,provider' })
+    await saveSocialTokenApi(platform, token)
     await get().loadStatus()
   },
 

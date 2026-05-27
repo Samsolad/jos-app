@@ -2,3 +2,9 @@
 
 [functions.gemini-proxy]
 verify_jwt = true
+
+[functions.embed-memory]
+verify_jwt = true
+
+[functions.integrations]
+verify_jwt = true

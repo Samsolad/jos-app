@@ -41,7 +41,8 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 |--------|---------|
 | `GOOGLE_CLIENT_ID` | Google Cloud OAuth client (Gmail + Calendar) |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-| `SUPABASE_SERVICE_ROLE_KEY` | Optional — refreshes tokens reliably (Dashboard → Settings → API) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Required** — stores OAuth tokens server-side (Dashboard → Settings → API) |
+| `ALLOWED_ORIGINS` | Comma-separated app origins for edge function CORS (e.g. `http://localhost:5173,https://your-app.vercel.app`) |
 
 4. **Google Cloud Console** → APIs & Services:
    - Enable **Gmail API** and **Google Calendar API**
@@ -50,6 +51,19 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
    - **Authorized redirect URI:** `https://YOUR_APP_DOMAIN/integrations/callback` (and `http://localhost:5173/integrations/callback` for local dev)
 
 5. In the app: **More → Connect** (or Profile → Integrations). Connect Google, scan inbox, block top-priority tasks on Calendar.
+
+### 0e. Security hardening (RLS + token lockdown)
+
+1. SQL Editor → paste `supabase/migrations/005_security.sql` → **Run**.
+2. Re-deploy all three edge functions (`gemini-proxy`, `embed-memory`, `integrations`) with the latest code from this repo.
+3. Add Edge Function secret **`ALLOWED_ORIGINS`** (comma-separated, no trailing slashes):
+
+   ```
+   http://localhost:5173,https://YOUR_APP_DOMAIN.vercel.app
+   ```
+
+4. **`SUPABASE_SERVICE_ROLE_KEY` is now required** for the `integrations` function (OAuth token storage is server-side only).
+5. In Supabase Dashboard → Edge Functions → enable **Verify JWT** on all three functions.
 
 ---
 
@@ -86,7 +100,7 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 
 1. Edge Functions → create **`integrations`**.
 2. Paste `supabase/functions/integrations/index.ts`.
-3. Deploy. Set secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and optionally `SUPABASE_SERVICE_ROLE_KEY`.
+3. Deploy. Set secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, and `ALLOWED_ORIGINS`.
 
 ---
 
@@ -99,7 +113,9 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 | `VITE_SUPABASE_URL` | Project URL (Dashboard → Settings → API) |
 | `VITE_SUPABASE_ANON_KEY` | **anon** `public` key only — never `service_role` |
 
-Remove `VITE_GEMINI_API_KEY` from Vercel if it is still set (Gemini runs on the edge function now).
+Remove `VITE_GEMINI_API_KEY` from Vercel if it is still set (Gemini runs on the edge function now; browser fallback is dev-only).
+
+Security headers (CSP, HSTS, etc.) are configured in `vercel.json` and apply on redeploy.
 
 Redeploy the site after changing env vars.
 

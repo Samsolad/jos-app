@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 const GEMINI_MODEL = 'gemini-2.0-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const PROXY_TIMEOUT_MS = 28_000
+const IS_DEV = import.meta.env.DEV
 
 function parseJsonFromText(text, json) {
   if (!json) return text
@@ -52,8 +53,9 @@ function extractGeminiText(data) {
   return parts.map((p) => p.text || '').join('')
 }
 
-/** Browser fallback when edge function is missing or slow (dev / emergency). */
+/** Dev-only browser fallback when edge function is missing or slow. */
 async function askGeminiDirect(messages, system = '', json = false) {
+  if (!IS_DEV) return null
   const key = import.meta.env.VITE_GEMINI_API_KEY?.trim()
   if (!key) return null
 
@@ -104,7 +106,11 @@ function invokeWithTimeout(body) {
     supabase.functions.invoke('gemini-proxy', { body }),
     new Promise((_, reject) => {
       setTimeout(
-        () => reject(new Error('AI timed out. Deploy gemini-proxy in Supabase or add VITE_GEMINI_API_KEY to .env.local.')),
+        () => reject(new Error(
+          IS_DEV
+            ? 'AI timed out. Deploy gemini-proxy in Supabase or add VITE_GEMINI_API_KEY to .env.local.'
+            : 'AI timed out. Deploy gemini-proxy in Supabase with GEMINI_API_KEY secret.',
+        )),
         PROXY_TIMEOUT_MS,
       )
     }),
@@ -112,7 +118,7 @@ function invokeWithTimeout(body) {
 }
 
 /**
- * Gemini via Supabase Edge Function, with timeout + optional direct fallback.
+ * Gemini via Supabase Edge Function. Direct browser key fallback is dev-only.
  */
 export async function askGemini(messages, system = '', json = false) {
   const payload = { messages, system, json, model: GEMINI_MODEL }
@@ -126,7 +132,9 @@ export async function askGemini(messages, system = '', json = false) {
       const fallback = await askGeminiDirect(messages, system, json)
       if (fallback !== null && fallback !== undefined) return fallback
       throw new Error(
-        `${msg}. Deploy gemini-proxy + GEMINI_API_KEY secret, or set VITE_GEMINI_API_KEY in .env.local.`,
+        IS_DEV
+          ? `${msg}. Deploy gemini-proxy + GEMINI_API_KEY secret, or set VITE_GEMINI_API_KEY in .env.local.`
+          : `${msg}. Deploy gemini-proxy and set GEMINI_API_KEY in Supabase Edge Function secrets.`,
       )
     }
 

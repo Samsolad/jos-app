@@ -35,11 +35,13 @@ export default function ResetPassword() {
       }
 
       const { data: { session } } = await supabase.auth.getSession()
-      if (!cancelled && session) setReady(true)
+      if (!cancelled && session && window.location.hash.includes('type=recovery')) {
+        setReady(true)
+      }
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
         setReady(true)
       }
     })
@@ -55,8 +57,8 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
       return
     }
     if (password !== confirm) {

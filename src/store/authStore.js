@@ -7,6 +7,23 @@ import {
   setLocalSessionId,
   sessionMismatch,
 } from '../lib/session'
+import { getTier } from '../lib/subscription'
+import { clampAuthorityLevel } from '../lib/authority'
+
+const ALLOWED_PROFILE_FIELDS = new Set([
+  'name',
+  'role',
+  'location',
+  'timezone',
+  'currency',
+  'notif_style',
+  'about',
+  'reminders',
+  'authority_level',
+  'authority_stats',
+  'preferences',
+  'onboarding_completed',
+])
 
 async function ensureProfileRow(user, nameHint) {
   const name =
@@ -76,8 +93,8 @@ const useAuthStore = create((set, get) => ({
         await supabase.auth.signOut()
         set({ user: null, profile: null, loading: false })
       } else if (!getLocalSessionId() && profile?.active_session_id) {
-        setLocalSessionId(profile.active_session_id)
-        set({ user: session.user, profile, loading: false })
+        await get().claimSession(session.user.id)
+        set({ user: session.user, profile: get().profile || profile, loading: false })
       } else if (!profile?.active_session_id) {
         await get().claimSession(session.user.id)
         set({ user: session.user, profile: get().profile || profile, loading: false })
@@ -125,9 +142,20 @@ const useAuthStore = create((set, get) => ({
   updateProfile: async (updates) => {
     const user = get().user
     if (!user) return
+    const profile = get().profile
+    const sanitized = {}
+    for (const [key, value] of Object.entries(updates || {})) {
+      if (!ALLOWED_PROFILE_FIELDS.has(key)) continue
+      sanitized[key] = value
+    }
+    if (sanitized.authority_level) {
+      sanitized.authority_level = clampAuthorityLevel(sanitized.authority_level, getTier(profile))
+    }
+    if (Object.keys(sanitized).length === 0) return profile
+
     const { data } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(sanitized)
       .eq('id', user.id)
       .select()
       .single()

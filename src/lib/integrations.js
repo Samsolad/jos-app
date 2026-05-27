@@ -50,21 +50,32 @@ export function appOrigin() {
   return ''
 }
 
+export const OAUTH_STATE_KEY = 'jos_oauth_state'
+
 export async function getGoogleAuthUrl() {
-  return invokeIntegration({
+  const data = await invokeIntegration({
     action: 'google_auth_url',
+    redirect_uri: `${appOrigin()}/integrations/callback`,
+    app_origin: appOrigin(),
+  })
+  if (data?.state && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(OAUTH_STATE_KEY, data.state)
+  }
+  return data
+}
+
+export async function exchangeGoogleCode(code, state) {
+  return invokeIntegration({
+    action: 'google_exchange',
+    code,
+    state,
     redirect_uri: `${appOrigin()}/integrations/callback`,
     app_origin: appOrigin(),
   })
 }
 
-export async function exchangeGoogleCode(code) {
-  return invokeIntegration({
-    action: 'google_exchange',
-    code,
-    redirect_uri: `${appOrigin()}/integrations/callback`,
-    app_origin: appOrigin(),
-  })
+export async function saveSocialToken(platform, token) {
+  return invokeIntegration({ action: 'save_social_token', platform, token })
 }
 
 export async function fetchIntegrationStatus() {

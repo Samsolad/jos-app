@@ -24,7 +24,7 @@ export default function Register() {
     setError('')
     if (!name.trim()) { setError('Please enter your name.'); return }
     if (!email || !email.includes('@')) { setError('Please enter a valid email.'); return }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     setLoading(true)
     try {
       await register(name.trim(), email, password)

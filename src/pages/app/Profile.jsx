@@ -4,12 +4,14 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { Link } from 'react-router-dom'
 import { getTier, tierLabel, LIMITS, canUseIntegrations } from '../../lib/subscription'
-import { authorityDescription, AUTH_LABELS, getAuthorityLevel } from '../../lib/authority'
+import { authorityDescription, AUTH_LABELS, getAuthorityLevel, allowedAuthorityLevels } from '../../lib/authority'
 import { getBehaviourSummary } from '../../lib/behaviour'
 import { ingestMemory } from '../../lib/memory'
 
 const CURRENCIES = ['£ GBP', '$ USD', '€ EUR', '₦ NGN', 'R ZAR', '¥ JPY']
 const NOTIF_STYLES = ['strict', 'balanced', 'gentle']
+const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024
+const ALLOWED_PROFILE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 
 export default function Profile() {
   const { profile, updateProfile, user } = useAuthStore()
@@ -82,11 +84,13 @@ export default function Profile() {
               {localStorage.getItem('jos_profile_photo') ? 'Change photo' : 'Add photo'}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files[0]
                   if (!file) return
+                  if (!ALLOWED_PROFILE_MIME.has(file.type)) return
+                  if (file.size > MAX_PROFILE_PHOTO_BYTES) return
                   const reader = new FileReader()
                   reader.onload = (ev) => {
                     localStorage.setItem('jos_profile_photo', ev.target.result)
@@ -252,7 +256,7 @@ export default function Profile() {
         <p className="font-serif text-[18px] font-bold mb-2">{auth.label}</p>
         <p className="text-[12px] text-[#888] font-light leading-relaxed mb-4">{auth.text}</p>
         <div className="flex flex-wrap gap-2 mb-4">
-          {Object.keys(AUTH_LABELS).map((level) => (
+          {allowedAuthorityLevels(getTier(profile)).map((level) => (
             <button
               key={level}
               type="button"

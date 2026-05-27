@@ -1,10 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.compose',
@@ -13,6 +8,8 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
 ].join(' ')
 
+const OAUTH_STATE_TTL_MS = 15 * 60 * 1000
+
 type IntegrationRow = {
   id: string
   provider: string
@@ -20,6 +17,88 @@ type IntegrationRow = {
   refresh_token: string | null
   expires_at: string | null
   metadata: Record<string, unknown>
+}
+
+function corsHeaders(req: Request): Record<string, string> {
+  const allowed = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const origin = req.headers.get('Origin') || ''
+  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || ''
+  return {
+    ...(allowOrigin ? { 'Access-Control-Allow-Origin': allowOrigin } : {}),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    Vary: 'Origin',
+  }
+}
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return true
+  const allowed = allowedOrigins().map((s) => s.replace(/\/$/, ''))
+  return allowed.includes(origin.replace(/\/$/, ''))
+}
+
+function jsonResponse(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
+  })
+}
+
+function allowedOrigins(): string[] {
+  return (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function resolveRedirectUri(redirectUri: string | undefined, appOrigin: string | undefined): string | null {
+  const origins = allowedOrigins().map((s) => s.replace(/\/$/, ''))
+  const app = (appOrigin || '').replace(/\/$/, '')
+  const fallbackBase = origins.includes(app) ? app : origins[0] || ''
+  const fallback = fallbackBase ? `${fallbackBase}/integrations/callback` : ''
+  const candidate = redirectUri || fallback
+  if (!candidate) return null
+  try {
+    const url = new URL(candidate)
+    const expectedPath = '/integrations/callback'
+    if (url.pathname !== expectedPath) return null
+    const origin = `${url.protocol}//${url.host}`
+    if (!origins.includes(origin.replace(/\/$/, ''))) return null
+    return candidate
+  } catch {
+    return null
+  }
+}
+
+function parseOAuthState(state: string | undefined, userId: string): string | null {
+  if (!state) return 'OAuth state is required'
+  try {
+    const parsed = JSON.parse(atob(state)) as { uid?: string; ts?: number }
+    if (parsed.uid !== userId) return 'OAuth state does not match signed-in user'
+    if (!parsed.ts || Date.now() - parsed.ts > OAUTH_STATE_TTL_MS) return 'OAuth state expired — try connecting again'
+    return null
+  } catch {
+    return 'Invalid OAuth state'
+  }
+}
+
+function sanitizeHeaderValue(value: unknown, maxLen = 500): string {
+  return String(value ?? '')
+    .replace(/[\r\n]/g, ' ')
+    .trim()
+    .slice(0, maxLen)
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function requireServiceAdmin(serviceKey: string | undefined) {
+  if (!serviceKey) return null
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  return createClient(supabaseUrl, serviceKey)
 }
 
 async function refreshGoogleToken(
@@ -77,20 +156,17 @@ async function getGoogleAccessToken(
   return row.access_token
 }
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders(req) })
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405)
+    return jsonResponse(req, { error: 'Method not allowed' }, 405)
+  }
+  const requestOrigin = req.headers.get('Origin') || ''
+  if (!isAllowedOrigin(requestOrigin)) {
+    return jsonResponse(req, { error: 'Origin not allowed' }, 403)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -99,7 +175,7 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization')
 
   if (!authHeader) {
-    return jsonResponse({ error: 'Missing Authorization header' }, 401)
+    return jsonResponse(req, { error: 'Missing Authorization header' }, 401)
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -107,51 +183,65 @@ Deno.serve(async (req) => {
   })
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    return jsonResponse({ error: 'Unauthorized' }, 401)
+    return jsonResponse(req, { error: 'Unauthorized' }, 401)
   }
 
-  const supabaseAdmin = serviceKey
-    ? createClient(supabaseUrl, serviceKey)
-    : supabase
+  const supabaseAdmin = requireServiceAdmin(serviceKey)
+  if (!supabaseAdmin) {
+    return jsonResponse(req, {
+      error: 'server_misconfigured',
+      message: 'Set SUPABASE_SERVICE_ROLE_KEY in Edge Function secrets.',
+    }, 503)
+  }
 
   try {
     const body = await req.json()
-    const { action, redirect_uri, code, max_results = 10, query, event } = body
+    const { action, redirect_uri, code, max_results = 10, query, event, state } = body
 
-    // ── OAuth: auth URL ─────────────────────────────────────────────
     if (action === 'google_auth_url') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       if (!clientId) {
-        return jsonResponse({
+        return jsonResponse(req, {
           error: 'not_configured',
           message: 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Edge Function secrets.',
         }, 503)
       }
-      const state = btoa(JSON.stringify({ uid: user.id, ts: Date.now() }))
+      const safeRedirect = resolveRedirectUri(redirect_uri, body.app_origin)
+      if (!safeRedirect) {
+        return jsonResponse(req, { error: 'Invalid redirect URI' }, 400)
+      }
+      const oauthState = btoa(JSON.stringify({ uid: user.id, ts: Date.now() }))
       const params = new URLSearchParams({
         client_id: clientId,
-        redirect_uri: redirect_uri || `${body.app_origin || ''}/integrations/callback`,
+        redirect_uri: safeRedirect,
         response_type: 'code',
         scope: GOOGLE_SCOPES,
         access_type: 'offline',
         prompt: 'consent',
-        state,
+        state: oauthState,
       })
-      return jsonResponse({
+      return jsonResponse(req, {
         url: `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
-        state,
+        state: oauthState,
       })
     }
 
-    // ── OAuth: exchange code ──────────────────────────────────────────
     if (action === 'google_exchange') {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
       const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
       if (!clientId || !clientSecret) {
-        return jsonResponse({ error: 'Google OAuth not configured on server.' }, 503)
+        return jsonResponse(req, { error: 'Google OAuth not configured on server.' }, 503)
       }
       if (!code) {
-        return jsonResponse({ error: 'code required' }, 400)
+        return jsonResponse(req, { error: 'code required' }, 400)
+      }
+      const stateError = parseOAuthState(state, user.id)
+      if (stateError) {
+        return jsonResponse(req, { error: stateError }, 403)
+      }
+      const safeRedirect = resolveRedirectUri(redirect_uri, body.app_origin)
+      if (!safeRedirect) {
+        return jsonResponse(req, { error: 'Invalid redirect URI' }, 400)
       }
 
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -161,13 +251,13 @@ Deno.serve(async (req) => {
           code,
           client_id: clientId,
           client_secret: clientSecret,
-          redirect_uri: redirect_uri || `${body.app_origin}/integrations/callback`,
+          redirect_uri: safeRedirect,
           grant_type: 'authorization_code',
         }),
       })
       const tokens = await tokenRes.json()
       if (!tokens.access_token) {
-        return jsonResponse({ error: tokens.error_description || 'Token exchange failed' }, 400)
+        return jsonResponse(req, { error: tokens.error_description || 'Token exchange failed' }, 400)
       }
 
       const expiresAt = new Date(
@@ -191,12 +281,32 @@ Deno.serve(async (req) => {
         .single()
 
       if (saveErr) {
-        return jsonResponse({ error: saveErr.message }, 500)
+        return jsonResponse(req, { error: saveErr.message }, 500)
       }
-      return jsonResponse({ ok: true, integration: saved })
+      return jsonResponse(req, { ok: true, integration: saved })
     }
 
-    // ── Disconnect ────────────────────────────────────────────────────
+    if (action === 'save_social_token') {
+      const platform = sanitizeHeaderValue(body.platform, 32).toLowerCase()
+      const token = sanitizeHeaderValue(body.token, 4096)
+      if (!['linkedin', 'facebook'].includes(platform)) {
+        return jsonResponse(req, { error: 'Unsupported platform' }, 400)
+      }
+      if (!token || token.length < 8) {
+        return jsonResponse(req, { error: 'Valid token required' }, 400)
+      }
+      const { error: saveErr } = await supabaseAdmin.from('user_integrations').upsert({
+        user_id: user.id,
+        provider: platform,
+        access_token: token,
+        status: 'connected',
+        metadata: { manual_token: true, saved_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,provider' })
+      if (saveErr) return jsonResponse(req, { error: saveErr.message }, 500)
+      return jsonResponse(req, { ok: true })
+    }
+
     if (action === 'disconnect') {
       const provider = body.provider || 'google'
       await supabaseAdmin
@@ -204,26 +314,24 @@ Deno.serve(async (req) => {
         .delete()
         .eq('user_id', user.id)
         .eq('provider', provider)
-      return jsonResponse({ ok: true })
+      return jsonResponse(req, { ok: true })
     }
 
-    // ── Status list ───────────────────────────────────────────────────
     if (action === 'status') {
       const { data: rows } = await supabase
         .from('user_integrations')
         .select('provider, status, expires_at, metadata, updated_at')
-      return jsonResponse({ integrations: rows || [] })
+      return jsonResponse(req, { integrations: rows || [] })
     }
 
     const accessToken = await getGoogleAccessToken(supabaseAdmin, user.id)
     if (!accessToken && ['gmail_list', 'gmail_send', 'calendar_list', 'calendar_create'].includes(action)) {
-      return jsonResponse({
+      return jsonResponse(req, {
         error: 'not_connected',
         message: 'Connect Google (Gmail + Calendar) in Integrations first.',
       }, 400)
     }
 
-    // ── Gmail: list recent ────────────────────────────────────────────
     if (action === 'gmail_list') {
       const res = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${Math.min(max_results, 20)}&q=${encodeURIComponent(query || 'is:inbox newer_than:7d')}`,
@@ -231,7 +339,7 @@ Deno.serve(async (req) => {
       )
       const list = await res.json()
       if (!res.ok) {
-        return jsonResponse({ error: list.error?.message || 'Gmail API failed' }, res.status)
+        return jsonResponse(req, { error: list.error?.message || 'Gmail API failed' }, res.status)
       }
 
       const messages = []
@@ -252,14 +360,19 @@ Deno.serve(async (req) => {
           snippet: detail.snippet,
         })
       }
-      return jsonResponse({ messages })
+      return jsonResponse(req, { messages })
     }
 
-    // ── Gmail: send (user-approved draft) ─────────────────────────────
     if (action === 'gmail_send') {
-      const { to, subject, body: emailBody, thread_id } = body
+      const to = sanitizeHeaderValue(body.to, 320)
+      const subject = sanitizeHeaderValue(body.subject, 500)
+      const emailBody = sanitizeHeaderValue(body.body, 20000)
+      const thread_id = sanitizeHeaderValue(body.thread_id, 128)
       if (!to || !subject || !emailBody) {
-        return jsonResponse({ error: 'to, subject, body required' }, 400)
+        return jsonResponse(req, { error: 'to, subject, body required' }, 400)
+      }
+      if (!isValidEmail(to)) {
+        return jsonResponse(req, { error: 'Invalid recipient email' }, 400)
       }
 
       const raw = [
@@ -287,12 +400,11 @@ Deno.serve(async (req) => {
       )
       const data = await res.json()
       if (!res.ok) {
-        return jsonResponse({ error: data.error?.message || 'Send failed' }, res.status)
+        return jsonResponse(req, { error: data.error?.message || 'Send failed' }, res.status)
       }
-      return jsonResponse({ ok: true, message_id: data.id })
+      return jsonResponse(req, { ok: true, message_id: data.id })
     }
 
-    // ── Calendar: list events ─────────────────────────────────────────
     if (action === 'calendar_list') {
       const timeMin = body.time_min || new Date().toISOString()
       const timeMax = body.time_max || new Date(Date.now() + 14 * 86400000).toISOString()
@@ -309,7 +421,7 @@ Deno.serve(async (req) => {
       )
       const data = await res.json()
       if (!res.ok) {
-        return jsonResponse({ error: data.error?.message || 'Calendar API failed' }, res.status)
+        return jsonResponse(req, { error: data.error?.message || 'Calendar API failed' }, res.status)
       }
       const events = (data.items || []).map((e: Record<string, unknown>) => ({
         id: e.id,
@@ -318,13 +430,12 @@ Deno.serve(async (req) => {
         end: e.end,
         description: e.description,
       }))
-      return jsonResponse({ events })
+      return jsonResponse(req, { events })
     }
 
-    // ── Calendar: create focus block ──────────────────────────────────
     if (action === 'calendar_create') {
       if (!event?.title || !event?.start || !event?.end) {
-        return jsonResponse({ error: 'event.title, start, end required' }, 400)
+        return jsonResponse(req, { error: 'event.title, start, end required' }, 400)
       }
       const res = await fetch(
         'https://www.googleapis.com/calendar/v3/calendars/primary/events',
@@ -335,8 +446,8 @@ Deno.serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            summary: `[J·OS] ${event.title}`,
-            description: event.description || 'Focus block from J·OS Priority Engine',
+            summary: `[J·OS] ${sanitizeHeaderValue(event.title, 200)}`,
+            description: sanitizeHeaderValue(event.description || 'Focus block from J·OS Priority Engine', 2000),
             start: { dateTime: event.start },
             end: { dateTime: event.end },
           }),
@@ -344,16 +455,17 @@ Deno.serve(async (req) => {
       )
       const data = await res.json()
       if (!res.ok) {
-        return jsonResponse({ error: data.error?.message || 'Create event failed' }, res.status)
+        return jsonResponse(req, { error: data.error?.message || 'Create event failed' }, res.status)
       }
-      return jsonResponse({ ok: true, event_id: data.id, htmlLink: data.htmlLink })
+      return jsonResponse(req, { ok: true, event_id: data.id, htmlLink: data.htmlLink })
     }
 
-    // ── Social: queue post (LinkedIn/Facebook need platform API keys) ─
     if (action === 'social_queue') {
-      const { platform, draft, scheduled_at } = body
+      const platform = sanitizeHeaderValue(body.platform, 32).toLowerCase()
+      const draft = sanitizeHeaderValue(body.draft, 10000)
+      const scheduled_at = body.scheduled_at || null
       if (!platform || !draft) {
-        return jsonResponse({ error: 'platform and draft required' }, 400)
+        return jsonResponse(req, { error: 'platform and draft required' }, 400)
       }
       const { data: row, error: qErr } = await supabase
         .from('social_post_queue')
@@ -362,14 +474,13 @@ Deno.serve(async (req) => {
           platform,
           draft,
           status: 'queued',
-          scheduled_at: scheduled_at || null,
+          scheduled_at,
         })
         .select()
         .single()
-      if (qErr) return jsonResponse({ error: qErr.message }, 500)
+      if (qErr) return jsonResponse(req, { error: qErr.message }, 500)
 
-      // If platform tokens exist, attempt publish (stub for LinkedIn/Facebook APIs)
-      const { data: plat } = await supabase
+      const { data: plat } = await supabaseAdmin
         .from('user_integrations')
         .select('access_token, metadata')
         .eq('user_id', user.id)
@@ -377,20 +488,20 @@ Deno.serve(async (req) => {
         .maybeSingle()
 
       if (!plat?.access_token) {
-        return jsonResponse({
+        return jsonResponse(req, {
           queued: row,
           note: `${platform} not connected — post saved for manual copy or connect in Integrations.`,
         })
       }
 
-      return jsonResponse({
+      return jsonResponse(req, {
         queued: row,
         note: 'Platform token stored. Configure platform API in Edge secrets for auto-publish.',
       })
     }
 
-    return jsonResponse({ error: `Unknown action: ${action}` }, 400)
+    return jsonResponse(req, { error: `Unknown action: ${action}` }, 400)
   } catch (err) {
-    return jsonResponse({ error: String(err) }, 500)
+    return jsonResponse(req, { error: String(err) }, 500)
   }
 })

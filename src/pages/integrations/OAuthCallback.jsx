@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import useIntegrationStore from '../../store/integrationStore'
+import { OAUTH_STATE_KEY } from '../../lib/integrations'
 
 export default function OAuthCallback() {
   const [searchParams] = useSearchParams()
@@ -10,7 +11,9 @@ export default function OAuthCallback() {
 
   useEffect(() => {
     const code = searchParams.get('code')
+    const state = searchParams.get('state')
     const err = searchParams.get('error')
+    const expectedState = sessionStorage.getItem(OAUTH_STATE_KEY)
 
     if (err) {
       setError('Google connection was cancelled or denied.')
@@ -20,8 +23,12 @@ export default function OAuthCallback() {
       setError('No authorization code received.')
       return
     }
+    if (!state || !expectedState || state !== expectedState) {
+      setError('Invalid OAuth state. Please try connecting again.')
+      return
+    }
 
-    finishGoogleOAuth(code)
+    finishGoogleOAuth(code, state)
       .then(() => navigate('/integrations', { replace: true }))
       .catch((e) => setError(e.message || 'Connection failed'))
   }, [searchParams, finishGoogleOAuth, navigate])

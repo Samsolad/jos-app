@@ -30,12 +30,29 @@ const TIER_DEFAULT_AUTHORITY = {
   free: 'suggest',
   personal: 'preview',
   operator: 'execute',
+  team: 'execute',
+}
+
+export const TIER_MAX_AUTHORITY = { ...TIER_DEFAULT_AUTHORITY }
+
+export function clampAuthorityLevel(level, tier) {
+  const max = TIER_MAX_AUTHORITY[tier] || TIER_MAX_AUTHORITY.free
+  if (AUTH_LEVELS[level] === undefined) return max
+  return AUTH_LEVELS[level] <= AUTH_LEVELS[max] ? level : max
+}
+
+export function allowedAuthorityLevels(tier) {
+  const max = TIER_MAX_AUTHORITY[tier] || TIER_MAX_AUTHORITY.free
+  return Object.keys(AUTH_LABELS).filter((level) => AUTH_LEVELS[level] <= AUTH_LEVELS[max])
 }
 
 export function getAuthorityLevel(profile) {
   const custom = profile?.authority_level
-  if (custom && AUTH_LEVELS[custom] !== undefined) return custom
-  return TIER_DEFAULT_AUTHORITY[getTier(profile)] || 'suggest'
+  const tier = getTier(profile)
+  if (custom && AUTH_LEVELS[custom] !== undefined) {
+    return clampAuthorityLevel(custom, tier)
+  }
+  return TIER_DEFAULT_AUTHORITY[tier] || 'suggest'
 }
 
 export function canAutoApply(profile, action) {
