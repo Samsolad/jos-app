@@ -28,7 +28,7 @@ export default function Register() {
     setLoading(true)
     try {
       await register(name.trim(), email, password)
-      navigate('/onboarding')
+      navigate('/')
     } catch (err) {
       if (err?.code === 'EMAIL_CONFIRMATION_REQUIRED') {
         setError(err.message)

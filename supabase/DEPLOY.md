@@ -65,6 +65,11 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 4. **`SUPABASE_SERVICE_ROLE_KEY` is now required** for the `integrations` function (OAuth token storage is server-side only).
 5. In Supabase Dashboard → Edge Functions → enable **Verify JWT** on all three functions.
 
+### 0f. Product plan (simplified app)
+
+1. SQL Editor → paste `supabase/migrations/006_product_plan.sql` → **Run**.
+2. One active plan per user is stored in `product_plans` (build + market steps).
+
 ---
 
 ## 1. Gemini secret (server-side API key)
@@ -75,6 +80,22 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
    - **Name:** `GEMINI_API_KEY`
    - **Value:** your Google AI Studio API key
 4. Save.
+
+### 1b. Optional free AI providers (Groq / OpenRouter)
+
+If you want alternatives to Gemini in the same `gemini-proxy`, add one or both:
+
+| Secret | Purpose |
+|--------|---------|
+| `GROQ_API_KEY` | Use Groq OpenAI-compatible chat endpoint |
+| `OPENROUTER_API_KEY` | Use OpenRouter chat endpoint |
+| `APP_BASE_URL` | Optional for OpenRouter attribution header (e.g. `https://YOUR_APP_DOMAIN`) |
+
+Optional model overrides (Edge secrets):
+- `LLM_PROVIDER` = `gemini` \| `groq` \| `openrouter`
+- `GROQ_MODEL` (default: `llama-3.1-8b-instant`)
+- `OPENROUTER_MODEL` (default: `meta-llama/llama-3.1-8b-instruct:free`)
+- `GEMINI_MODEL` (default: `gemini-2.0-flash`)
 
 ---
 
@@ -112,6 +133,8 @@ You should see success for the four `ALTER TABLE ... ADD COLUMN meta` statements
 |----------|--------|
 | `VITE_SUPABASE_URL` | Project URL (Dashboard → Settings → API) |
 | `VITE_SUPABASE_ANON_KEY` | **anon** `public` key only — never `service_role` |
+| `VITE_LLM_PROVIDER` | Optional: `gemini` \| `groq` \| `openrouter` (default `gemini`) |
+| `VITE_LLM_MODEL` | Optional model override for selected provider |
 
 Remove `VITE_GEMINI_API_KEY` from Vercel if it is still set (Gemini runs on the edge function now; browser fallback is dev-only).
 

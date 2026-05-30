@@ -5,6 +5,8 @@ const GEMINI_MODEL = 'gemini-2.0-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const PROXY_TIMEOUT_MS = 28_000
 const IS_DEV = import.meta.env.DEV
+const LLM_PROVIDER = (import.meta.env.VITE_LLM_PROVIDER || 'gemini').toLowerCase()
+const LLM_MODEL = import.meta.env.VITE_LLM_MODEL?.trim() || ''
 
 function parseJsonFromText(text, json) {
   if (!json) return text
@@ -121,7 +123,13 @@ function invokeWithTimeout(body) {
  * Gemini via Supabase Edge Function. Direct browser key fallback is dev-only.
  */
 export async function askGemini(messages, system = '', json = false) {
-  const payload = { messages, system, json, model: GEMINI_MODEL }
+  const payload = {
+    messages,
+    system,
+    json,
+    provider: LLM_PROVIDER,
+    ...(LLM_MODEL ? { model: LLM_MODEL } : {}),
+  }
 
   try {
     const { data, error } = await invokeWithTimeout(payload)

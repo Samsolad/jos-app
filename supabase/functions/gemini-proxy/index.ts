@@ -1,7 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const GEMINI_MODEL = 'gemini-2.0-flash'
+const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const GROQ_MODEL = Deno.env.get('GROQ_MODEL') || 'llama-3.1-8b-instant'
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_MODEL = Deno.env.get('OPENROUTER_MODEL') || 'meta-llama/llama-3.1-8b-instruct:free'
+const DEFAULT_PROVIDER = (Deno.env.get('LLM_PROVIDER') || 'gemini').toLowerCase()
 const MAX_MESSAGES = 20
 const MAX_TOTAL_CHARS = 50000
 const MAX_SYSTEM_CHARS = 10000
@@ -41,6 +46,7 @@ function jsonResponse(req: Request, body: unknown, status = 200) {
 }
 
 type ChatMessage = { role: string; content: string }
+type LlmProvider = 'gemini' | 'groq' | 'openrouter'
 
 function toGeminiContents(messages: ChatMessage[]) {
   const out: { role: string; parts: { text: string }[] }[] = []
@@ -79,6 +85,116 @@ function validateMessages(messages: unknown, system: unknown): string | null {
   return null
 }
 
+function toOpenAiMessages(messages: ChatMessage[], system: string) {
+  const out: { role: string; content: string }[] = []
+  if (system) out.push({ role: 'system', content: system })
+  for (const m of messages) {
+    out.push({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+    })
+  }
+  return out
+}
+
+function extractOpenAiText(data: Record<string, unknown>): string {
+  const choices = data.choices as Array<{ message?: { content?: string } }> | undefined
+  const content = choices?.[0]?.message?.content
+  return typeof content === 'string' ? content : ''
+}
+
+function resolveProvider(raw: unknown): LlmProvider {
+  const p = String(raw || DEFAULT_PROVIDER).toLowerCase()
+  if (p === 'groq') return 'groq'
+  if (p === 'openrouter') return 'openrouter'
+  return 'gemini'
+}
+
+function sanitizeModel(raw: unknown): string {
+  const value = String(raw || '').trim()
+  if (!value) return ''
+  return value.slice(0, 120)
+}
+
+async function callGemini(messages: ChatMessage[], system: string, json: boolean) {
+  const geminiKey = Deno.env.get('GEMINI_API_KEY')
+  if (!geminiKey) return { error: 'GEMINI_API_KEY secret is not set on this project.', status: 500 }
+
+  const body: Record<string, unknown> = {
+    contents: toGeminiContents(messages),
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: 0.7,
+      ...(json ? { responseMimeType: 'application/json' } : {}),
+    },
+  }
+  if (system) {
+    body.systemInstruction = { parts: [{ text: system }] }
+  }
+
+  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) {
+    const msg = data.error?.message || res.statusText || 'Gemini request failed'
+    return { error: msg, status: res.status || 502 }
+  }
+
+  return { text: extractText(data), model: GEMINI_MODEL }
+}
+
+async function callOpenAiCompatible(
+  provider: 'groq' | 'openrouter',
+  messages: ChatMessage[],
+  system: string,
+  json: boolean,
+  overrideModel: string,
+) {
+  const key = provider === 'groq'
+    ? Deno.env.get('GROQ_API_KEY')
+    : Deno.env.get('OPENROUTER_API_KEY')
+  if (!key) {
+    const secretName = provider === 'groq' ? 'GROQ_API_KEY' : 'OPENROUTER_API_KEY'
+    return { error: `${secretName} secret is not set on this project.`, status: 500 }
+  }
+
+  const model = overrideModel || (provider === 'groq' ? GROQ_MODEL : OPENROUTER_MODEL)
+  const url = provider === 'groq' ? GROQ_URL : OPENROUTER_URL
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  }
+  if (provider === 'openrouter') {
+    const appUrl = (Deno.env.get('APP_BASE_URL') || '').trim()
+    if (appUrl) headers['HTTP-Referer'] = appUrl
+    headers['X-Title'] = 'J-OS'
+  }
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: toOpenAiMessages(messages, system),
+    temperature: 0.7,
+  }
+  if (json) body.response_format = { type: 'json_object' }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) {
+    const msg = data.error?.message || res.statusText || `${provider} request failed`
+    return { error: msg, status: res.status || 502 }
+  }
+
+  return { text: extractOpenAiText(data), model }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders(req) })
@@ -90,11 +206,6 @@ Deno.serve(async (req) => {
   const requestOrigin = req.headers.get('Origin') || ''
   if (!isAllowedOrigin(requestOrigin)) {
     return jsonResponse(req, { error: 'Origin not allowed' }, 403)
-  }
-
-  const geminiKey = Deno.env.get('GEMINI_API_KEY')
-  if (!geminiKey) {
-    return jsonResponse(req, { error: 'GEMINI_API_KEY secret is not set on this project.' }, 500)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -113,37 +224,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages, system = '', json = false } = await req.json()
+    const { messages, system = '', json = false, provider, model } = await req.json()
     const validationError = validateMessages(messages, system)
     if (validationError) {
       return jsonResponse(req, { error: validationError }, 400)
     }
+    const selectedProvider = resolveProvider(provider)
+    const selectedModel = sanitizeModel(model)
+    const chatMessages = messages as ChatMessage[]
 
-    const body: Record<string, unknown> = {
-      contents: toGeminiContents(messages as ChatMessage[]),
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.7,
-        ...(json ? { responseMimeType: 'application/json' } : {}),
-      },
-    }
-    if (system) {
-      body.systemInstruction = { parts: [{ text: system }] }
-    }
+    const result = selectedProvider === 'gemini'
+      ? await callGemini(chatMessages, system, json)
+      : await callOpenAiCompatible(selectedProvider, chatMessages, system, json, selectedModel)
 
-    const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(geminiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    if (result.error) {
+      return jsonResponse(req, { error: result.error }, result.status || 502)
+    }
+    return jsonResponse(req, {
+      text: result.text || '',
+      provider: selectedProvider,
+      model: result.model || selectedModel || null,
     })
-
-    const data = await res.json()
-    if (!res.ok || data.error) {
-      const msg = data.error?.message || res.statusText || 'Gemini request failed'
-      return jsonResponse(req, { error: msg }, res.status || 502)
-    }
-
-    return jsonResponse(req, { text: extractText(data) })
   } catch (err) {
     return jsonResponse(req, { error: String(err) }, 500)
   }

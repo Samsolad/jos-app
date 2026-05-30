@@ -11,24 +11,24 @@ import {
 
 const STEPS = [
   {
-    title: 'Create your OS',
-    body: 'Register and run the setup wizard — role, projects, goals, habits, and how you want J·OS to speak to you.',
+    title: 'Describe your idea',
+    body: 'One sentence is enough — what you want to build and who it helps.',
   },
   {
-    title: 'Command Hub',
-    body: 'Your dashboard picks what matters today: daily focus, next action, reminders, and a priority-ranked task view.',
+    title: 'Build the product',
+    body: 'Get a clear checklist from MVP to launch-ready product.',
   },
   {
-    title: 'Capture & execute',
-    body: 'Add projects and tasks, set goals with steps, log habits, and use Navigator to turn messy input into a lean plan.',
+    title: 'Get to market',
+    body: 'Marketing steps to reach your first users and validate demand.',
   },
   {
-    title: 'AI assistant',
-    body: 'Chat with context from your profile and memory. Free tier includes limited messages per day; upgrade for more.',
+    title: 'Always know what\'s next',
+    body: 'The top card shows the single next step to focus on.',
   },
   {
-    title: 'Life & business modules',
-    body: 'Track revenue, social drafts, family check-ins, and (on Operator+) Gmail, Calendar, and WhatsApp paste-to-actions.',
+    title: 'Replan when life changes',
+    body: 'Describe what shifted — budget, timeline, team — and remaining steps rearrange.',
   },
 ]
 
@@ -182,7 +182,7 @@ export default function HowItWorksGuide() {
             className="flex-[2] py-2.5 text-center text-[11px] font-semibold tracking-[0.08em] uppercase bg-white text-[#080808] rounded hover:bg-[#e8e8e8] transition-colors"
             onClick={closeForSession}
           >
-            Create your OS
+            Create your plan
           </Link>
         </div>
       </div>
